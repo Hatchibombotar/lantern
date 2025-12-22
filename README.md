@@ -6,6 +6,7 @@ In the below picture, it shows all files linked to the parrot in the vanilla pac
 ![Example](images/preview.png)
 
 In the below picture, it shows all files linked to the bat in the vanilla packs. The group view is in the secondary sidebar.
+
 ![Example](images/preview-2.png)
 
 ## Groups
