@@ -1,0 +1,472 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+
+import * as JSONC from "jsonc-parser"
+
+export type Node = Folder | EntityInfo | Root
+
+export type Folder = {
+	type: "folder"
+	name: string
+	children: (EntityInfo | Folder)[]
+}
+export type EntityInfo = {
+	type: "entity",
+	identifier: string,
+	files: { fileType: EntityFileType, path: string }[]
+}
+export type Root = {
+	type: "root",
+	rootType: "entities" | "items"
+}
+
+// identifier: string
+// todo: make all values arrays to account for duplicates
+type ProjectData = {
+	// RP
+	"rp_entity": Record<string, {
+		path: string
+		animations: string[],
+		render_controllers: string[],
+	}>
+	"rp_attachables": Record<string, {
+		path: string
+		animations: string[],
+		render_controllers: string[],
+	}>
+	"rp_anims": Record<string, string>,
+	"rp_animation_controllers": Record<string, string>,
+	"rp_render_controllers": Record<string, string>,
+
+	// BP
+	"bp_entity": Record<string, {
+		path: string
+		animations: string[],
+	}>
+	"bp_anims": Record<string, string>,
+	"bp_animation_controllers": Record<string, string>,
+	"bp_items": Record<string, string>,
+}
+
+enum EntityFileType {
+	bp_entity,
+	rp_entity,
+	rp_animation,
+	bp_animation,
+	rp_animation_controllers,
+	bp_animation_controllers,
+	rp_render_controllers,
+	bp_items,
+	rp_attachable,
+}
+
+export const entity_file_type_names: Record<EntityFileType, string> = {
+	[EntityFileType.bp_entity]: "bp/entities",
+	[EntityFileType.rp_entity]: "rp/entity",
+	[EntityFileType.rp_animation]: "rp/animations",
+	[EntityFileType.bp_animation]: "bp/animations",
+	[EntityFileType.rp_animation_controllers]: "rp/animation_controllers",
+	[EntityFileType.bp_animation_controllers]: "bp/animation_controllers",
+	[EntityFileType.rp_render_controllers]: "rp/render_controllers",
+	[EntityFileType.bp_items]: "bp/items",
+	[EntityFileType.rp_attachable]: "rp/attachables",
+}
+
+export function getProjectInfo() {
+	const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+	if (rootPath === undefined) {
+		return
+	}
+	const configPath = rootPath + "/config.json"
+	if (!fs.existsSync(configPath)) {
+		vscode.window.showErrorMessage("Unable to find config.json")
+		return
+	}
+	const config = JSONC.parse(fs.readFileSync(configPath).toString())
+
+	const behaviorPackDir = path.join(rootPath, config.packs.behaviorPack)
+	const resourcePackDir = path.join(rootPath, config.packs.resourcePack)
+	if (!fs.existsSync(behaviorPackDir)) {
+		vscode.window.showErrorMessage("Unable to find BP")
+		return
+	}
+	if (!fs.existsSync(resourcePackDir)) {
+		vscode.window.showErrorMessage("Unable to find RP")
+		return
+	}
+
+	return [resourcePackDir, behaviorPackDir]
+}
+
+export function parseProject(): (ProjectData | void) {
+	const [resourcePackDir, behaviorPackDir] = getProjectInfo() ?? []
+	console.log(resourcePackDir, behaviorPackDir)
+	if (resourcePackDir === undefined) {
+		return
+	}
+
+	const rp_entities: ProjectData["rp_entity"] = {}
+	const rp_entity_files = fs.globSync(path.join(resourcePackDir, "./entity/**/*.json"))
+	for (const entity_path of rp_entity_files) {
+		const entity_file = fs.readFileSync(entity_path).toString()
+		const rp_entity = JSONC.parse(entity_file)
+		const identifier = rp_entity["minecraft:client_entity"].description.identifier
+
+		const render_controllers: string[] = []
+		if (rp_entity["minecraft:client_entity"].description.render_controllers) {
+			for (const rc of rp_entity["minecraft:client_entity"].description.render_controllers) {
+				if (typeof rc === "string") {
+					render_controllers.push(rc)
+				} else if (typeof rc === "object") {
+					for (const key of Object.keys(rc)) {
+						render_controllers.push(key)
+					}
+				} else {
+					console.error("unexpected typeof rc")
+				}
+			}
+		}
+
+		rp_entities[identifier] = {
+			path: entity_path,
+			animations: rp_entity["minecraft:client_entity"].description.animations ? Object.values(rp_entity["minecraft:client_entity"].description.animations) : [],
+			render_controllers
+		}
+	}
+	
+	const rp_attachables: ProjectData["rp_attachables"] = {}
+	const rp_attachable_files = fs.globSync(path.join(resourcePackDir, "./attachables/**/*.json"))
+	for (const entity_path of rp_attachable_files) {
+		const entity_file = fs.readFileSync(entity_path).toString()
+		const rp_entity = JSONC.parse(entity_file)
+		const identifier = rp_entity["minecraft:attachable"].description.identifier
+
+		const render_controllers: string[] = []
+		if (rp_entity["minecraft:attachable"].description.render_controllers) {
+			for (const rc of rp_entity["minecraft:attachable"].description.render_controllers) {
+				if (typeof rc === "string") {
+					render_controllers.push(rc)
+				} else if (typeof rc === "object") {
+					for (const key of Object.keys(rc)) {
+						render_controllers.push(key)
+					}
+				} else {
+					console.error("unexpected typeof rc")
+				}
+			}
+		}
+
+		rp_attachables[identifier] = {
+			path: entity_path,
+			animations: rp_entity["minecraft:attachable"].description.animations ? Object.values(rp_entity["minecraft:attachable"].description.animations) : [],
+			render_controllers
+		}
+	}
+
+	const rp_anims: ProjectData["rp_anims"] = {}
+	const rp_anim_files = fs.globSync(path.join(resourcePackDir, "./animations/**/*.json"))
+	for (const path of rp_anim_files) {
+		const file = fs.readFileSync(path).toString()
+		const animations = JSONC.parse(file)
+		for (const anim in animations.animations) {
+			rp_anims[anim] = path
+		}
+	}
+
+	const bp_anims: ProjectData["bp_anims"] = {}
+	const bp_anim_files = fs.globSync(path.join(behaviorPackDir, "./animations/**/*.json"))
+	for (const path of bp_anim_files) {
+		const file = fs.readFileSync(path).toString()
+		const animations = JSONC.parse(file)
+		for (const anim in animations.animations) {
+			bp_anims[anim] = path
+		}
+	}
+
+	const rp_animation_controllers: ProjectData["rp_animation_controllers"] = {}
+	const rp_animation_controller_files = fs.globSync(path.join(resourcePackDir, "./animation_controllers/**/*.json"))
+	for (const path of rp_animation_controller_files) {
+		const file = fs.readFileSync(path).toString()
+		const animations = JSONC.parse(file)
+		for (const anim in animations.animation_controllers) {
+			rp_animation_controllers[anim] = path
+		}
+	}
+
+	const bp_animation_controllers: ProjectData["bp_animation_controllers"] = {}
+	const bp_animation_controller_files = fs.globSync(path.join(behaviorPackDir, "./animation_controllers/**/*.json"))
+	for (const path of bp_animation_controller_files) {
+		const file = fs.readFileSync(path).toString()
+		const animations = JSONC.parse(file)
+		for (const anim in animations.animation_controllers) {
+			bp_animation_controllers[anim] = path
+		}
+	}
+
+	const rp_render_controllers: ProjectData["rp_render_controllers"] = {}
+	const rp_rc_files = fs.globSync(path.join(resourcePackDir, "./render_controllers/**/*.json"))
+	for (const path of rp_rc_files) {
+		const file = fs.readFileSync(path).toString()
+		const rc = JSONC.parse(file)
+		for (const anim in rc.render_controllers) {
+			rp_render_controllers[anim] = path
+		}
+	}
+
+	const bp_entities: ProjectData["bp_entity"] = {}
+	const bp_entity_files = fs.globSync(path.join(behaviorPackDir, "./entities/**/*.json"))
+	for (const entity_path of bp_entity_files) {
+		const entity_file = fs.readFileSync(entity_path).toString()
+		const entity = JSONC.parse(entity_file)
+		const identifier = entity["minecraft:entity"].description.identifier
+
+		bp_entities[identifier] = {
+			path: entity_path,
+			animations: entity["minecraft:entity"].description.animations ? Object.values(entity["minecraft:entity"].description.animations) : [],
+		}
+	}
+
+	const bp_items: ProjectData["bp_items"] = {}
+	const bp_item_files = fs.globSync(path.join(behaviorPackDir, "./items/**/*.json"))
+	for (const path of bp_item_files) {
+		const file = fs.readFileSync(path).toString()
+		const item = JSONC.parse(file)
+		const identifier = item["minecraft:item"].description.identifier
+
+		bp_items[identifier] = path
+	}
+
+	const projectData: ProjectData = {
+		rp_entity: rp_entities,
+		rp_anims: rp_anims,
+		bp_anims: bp_anims,
+		bp_animation_controllers,
+		rp_animation_controllers,
+		rp_render_controllers,
+		bp_entity: bp_entities,
+		
+		bp_items: bp_items,
+		rp_attachables: rp_attachables,
+	}
+	return projectData
+	// return parseEntitiesInFolder(path.join(behaviorPackDir, "./entities/"), projectData, true)
+}
+
+export function parseEntitiesInFolder(folderPath: string, projectData: ProjectData, isRoot = false): Folder {
+	const folder: Folder = {
+		type: "folder",
+		children: [],
+		name: folderPath.split("\\").at(-1) ?? "<folder>"
+	}
+
+	for (const subfolder of fs.readdirSync(folderPath)) {
+		const subfolderPath = path.join(folderPath, subfolder)
+		const stat = fs.statSync(subfolderPath)
+		if (stat.isDirectory()) {
+			folder.children.push(
+				parseEntitiesInFolder(subfolderPath, projectData)
+			)
+		}
+	}
+
+	const BPEntityFiles = fs.globSync(path.join(folderPath, "/*.json"))
+	for (const BPEntityFile of BPEntityFiles) {
+		const [identifier, bp_entity] = Object.entries(projectData.bp_entity).find(([_, v]) => v.path === BPEntityFile) ?? []
+
+		if (identifier === undefined || bp_entity === undefined) {
+			continue
+		}
+
+		const rp_entity = projectData.rp_entity[identifier]
+
+		const entityInfo: EntityInfo = {
+			type: "entity",
+			identifier: identifier,
+			files: [
+				{ fileType: EntityFileType.bp_entity, path: BPEntityFile },
+			]
+		}
+		if (rp_entity) {
+			entityInfo.files.push(
+				{ fileType: EntityFileType.rp_entity, path: rp_entity.path },
+			)
+			for (const rp_animation of rp_entity.animations) {
+				if (projectData.rp_anims[rp_animation] !== undefined) {
+					const path = projectData.rp_anims[rp_animation]
+					if (entityInfo.files.find((v) => v.path === path)) {
+						continue
+					}
+					entityInfo.files.push(
+						{
+							fileType: EntityFileType.rp_animation,
+							path: path
+						}
+					)
+				} else if (projectData.rp_animation_controllers[rp_animation] !== undefined) {
+					const path = projectData.rp_animation_controllers[rp_animation]
+					if (entityInfo.files.find((v) => v.path === path)) {
+						continue
+					}
+					entityInfo.files.push(
+						{
+							fileType: EntityFileType.rp_animation_controllers,
+							path: path
+						}
+					)
+				}
+			}
+			for (const rp_render_controller of rp_entity.render_controllers) {
+				const path = projectData.rp_render_controllers[rp_render_controller]
+				if (!path) {
+					// rc does not exist in this project
+					continue
+				}
+				if (entityInfo.files.find((v) => v.path === path)) {
+					continue
+				}
+				entityInfo.files.push(
+					{
+						fileType: EntityFileType.rp_render_controllers,
+						path: path
+					}
+				)
+			}
+		}
+
+		for (const bp_animation of bp_entity.animations) {
+			if (projectData.bp_anims[bp_animation] !== undefined) {
+				const path = projectData.bp_anims[bp_animation]
+				if (entityInfo.files.find((v) => v.path === path)) {
+					continue
+				}
+				entityInfo.files.push(
+					{
+						fileType: EntityFileType.bp_animation,
+						path: path
+					}
+				)
+			} else if (projectData.bp_animation_controllers[bp_animation] !== undefined) {
+				const path = projectData.bp_animation_controllers[bp_animation]
+				if (entityInfo.files.find((v) => v.path === path)) {
+					continue
+				}
+				entityInfo.files.push(
+					{
+						fileType: EntityFileType.bp_animation_controllers,
+						path: path
+					}
+				)
+			}
+		}
+
+		folder.children.push(entityInfo)
+	}
+
+	if (!isRoot && folder.children.length === 1 && isFolder(folder.children[0])) {
+		const subfolder = folder.children[0]
+		subfolder.name = folder.name + "\\" + subfolder.name
+		return subfolder
+	}
+
+	return folder
+}
+
+
+export function parseItemsInFolder(folderPath: string, projectData: ProjectData, isRoot = false): Folder {
+	const folder: Folder = {
+		type: "folder",
+		children: [],
+		name: folderPath.split("\\").at(-1) ?? "<folder>"
+	}
+
+	for (const subfolder of fs.readdirSync(folderPath)) {
+		const subfolderPath = path.join(folderPath, subfolder)
+		const stat = fs.statSync(subfolderPath)
+		if (stat.isDirectory()) {
+			folder.children.push(
+				parseItemsInFolder(subfolderPath, projectData)
+			)
+		}
+	}
+
+	const BPItemFiles = fs.globSync(path.join(folderPath, "/*.json"))
+	for (const BPItemFile of BPItemFiles) {
+		const [identifier, bp_item] = Object.entries(projectData.bp_items).find(([_, path]) => path === BPItemFile) ?? []
+
+		if (identifier === undefined || bp_item === undefined) {
+			continue
+		}
+
+		const attachable = projectData.rp_attachables[identifier]
+
+		const entityInfo: EntityInfo = {
+			type: "entity",
+			identifier: identifier,
+			files: [
+				{ fileType: EntityFileType.bp_items, path: BPItemFile },
+			]
+		}
+		if (attachable) {
+			entityInfo.files.push(
+				{ fileType: EntityFileType.rp_attachable, path: attachable.path },
+			)
+			for (const rp_animation of attachable.animations) {
+				if (projectData.rp_anims[rp_animation] !== undefined) {
+					const path = projectData.rp_anims[rp_animation]
+					if (entityInfo.files.find((v) => v.path === path)) {
+						continue
+					}
+					entityInfo.files.push(
+						{
+							fileType: EntityFileType.rp_animation,
+							path: path
+						}
+					)
+				} else if (projectData.rp_animation_controllers[rp_animation] !== undefined) {
+					const path = projectData.rp_animation_controllers[rp_animation]
+					if (entityInfo.files.find((v) => v.path === path)) {
+						continue
+					}
+					entityInfo.files.push(
+						{
+							fileType: EntityFileType.rp_animation_controllers,
+							path: path
+						}
+					)
+				}
+			}
+			for (const rp_render_controller of attachable.render_controllers) {
+				const path = projectData.rp_render_controllers[rp_render_controller]
+				if (!path) {
+					// rc does not exist in this project
+					continue
+				}
+				if (entityInfo.files.find((v) => v.path === path)) {
+					continue
+				}
+				entityInfo.files.push(
+					{
+						fileType: EntityFileType.rp_render_controllers,
+						path: path
+					}
+				)
+			}
+		}
+
+		folder.children.push(entityInfo)
+	}
+
+	if (!isRoot && folder.children.length === 1 && isFolder(folder.children[0])) {
+		const subfolder = folder.children[0]
+		subfolder.name = folder.name + "\\" + subfolder.name
+		return subfolder
+	}
+
+	return folder
+}
+
+export function isFolder(x: any): x is Folder {
+	return x && x.type === "folder"
+}
+
