@@ -3,10 +3,10 @@ An extension that adds a new view within the explorer which groups Minecraft Bed
 
 In the below picture, it shows all files linked to the parrot in the vanilla packs. The group view is in the same panel as the exploere.
 
-![feature X](./images/preview.png)
+![Example](images/preview.png)
 
 In the below picture, it shows all files linked to the bat in the vanilla packs. The group view is in the secondary sidebar.
-![feature X](./images/preview-2.png)
+![Example](images/preview-2.png)
 
 ## Groups
 The extension groups by the following files:
