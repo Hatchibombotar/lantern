@@ -22,3 +22,7 @@ All notable changes to the "bedrock-collator" extension will be documented in th
     - RP Attachable Animation
     - RP Attachable Animation Controller
     - RP Attachable Render Controller
+
+## [0.1.0]
+
+- Added support for entities where there is no BP file, only a RP.

@@ -101,7 +101,6 @@ export function getProjectInfo() {
 
 export function parseProject(): (ProjectData | void) {
 	const [resourcePackDir, behaviorPackDir] = getProjectInfo() ?? []
-	console.log(resourcePackDir, behaviorPackDir)
 	if (resourcePackDir === undefined) {
 		return
 	}
@@ -134,7 +133,7 @@ export function parseProject(): (ProjectData | void) {
 			render_controllers
 		}
 	}
-	
+
 	const rp_attachables: ProjectData["rp_attachables"] = {}
 	const rp_attachable_files = fs.globSync(path.join(resourcePackDir, "./attachables/**/*.json"))
 	for (const entity_path of rp_attachable_files) {
@@ -245,7 +244,7 @@ export function parseProject(): (ProjectData | void) {
 		rp_animation_controllers,
 		rp_render_controllers,
 		bp_entity: bp_entities,
-		
+
 		bp_items: bp_items,
 		rp_attachables: rp_attachables,
 	}
@@ -253,39 +252,114 @@ export function parseProject(): (ProjectData | void) {
 	// return parseEntitiesInFolder(path.join(behaviorPackDir, "./entities/"), projectData, true)
 }
 
-export function parseEntitiesInFolder(folderPath: string, projectData: ProjectData, isRoot = false): Folder {
+export function parseEntitiesInFolder(folderPath: string, projectData: ProjectData, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
 		type: "folder",
 		children: [],
 		name: folderPath.split("\\").at(-1) ?? "<folder>"
 	}
 
-	for (const subfolder of fs.readdirSync(folderPath)) {
-		const subfolderPath = path.join(folderPath, subfolder)
-		const stat = fs.statSync(subfolderPath)
-		if (stat.isDirectory()) {
-			folder.children.push(
-				parseEntitiesInFolder(subfolderPath, projectData)
-			)
+	const BPPath = path.join(behaviorPackDir, "./entities/", folderPath)
+	const RPPath = path.join(resourcePackDir, "./entity/", folderPath)
+	const BPExists = fs.existsSync(BPPath)
+	const RPExists = fs.existsSync(RPPath)
+
+
+	const subfolders = []
+	if (BPExists) {
+		for (const subfolder of fs.readdirSync(BPPath)) {
+			const stat = fs.statSync(path.join(BPPath, subfolder))
+			if (stat.isDirectory()) {
+				subfolders.push(subfolder)
+			}
 		}
 	}
 
-	const BPEntityFiles = fs.globSync(path.join(folderPath, "/*.json"))
+	if (RPExists) {
+		for (const subfolder of fs.readdirSync(RPPath)) {
+			const stat = fs.statSync(path.join(RPPath, subfolder))
+			if (stat.isDirectory() && !subfolders.includes(subfolder)) {
+				subfolders.push(subfolder)
+			}
+		}
+	}
+
+	for (const subfolder of subfolders) {
+		const subfolderPath = path.join(folderPath, subfolder)
+
+		const folderData = parseEntitiesInFolder(subfolderPath, projectData, behaviorPackDir, resourcePackDir)
+		if (folderData.children.length === 0) {
+			continue
+		}
+		folder.children.push(folderData)
+	}
+
+
+	const RPEntityFiles = RPExists ? fs.globSync(path.join(RPPath, "/*.json")) : []
+	const BPEntityFiles = BPExists ? fs.globSync(path.join(BPPath, "/*.json")) : []
+
+	const entityIdentifiers: string[] = []
+
+
 	for (const BPEntityFile of BPEntityFiles) {
 		const [identifier, bp_entity] = Object.entries(projectData.bp_entity).find(([_, v]) => v.path === BPEntityFile) ?? []
 
 		if (identifier === undefined || bp_entity === undefined) {
 			continue
 		}
+		entityIdentifiers.push(identifier)
+	}
+	for (const RPEntityFile of RPEntityFiles) {
+		const [identifier, rp_entity] = Object.entries(projectData.rp_entity).find(([_, v]) => v.path === RPEntityFile) ?? []
 
+		if (identifier === undefined || rp_entity === undefined || entityIdentifiers.includes(identifier)) {
+			continue
+		}
+		const bp_entity = projectData.bp_entity[identifier]
+		if (bp_entity) {
+			continue
+		}
+		entityIdentifiers.push(identifier)
+	}
+
+	for (const identifier of entityIdentifiers) {
+		const bp_entity = projectData.bp_entity[identifier]
 		const rp_entity = projectData.rp_entity[identifier]
 
 		const entityInfo: EntityInfo = {
 			type: "entity",
 			identifier: identifier,
-			files: [
-				{ fileType: EntityFileType.bp_entity, path: BPEntityFile },
-			]
+			files: []
+		}
+		if (bp_entity) {
+			entityInfo.files.push(
+				{ fileType: EntityFileType.bp_entity, path: bp_entity.path },
+			)
+			for (const bp_animation of bp_entity.animations) {
+				if (projectData.bp_anims[bp_animation] !== undefined) {
+					const path = projectData.bp_anims[bp_animation]
+					if (entityInfo.files.find((v) => v.path === path)) {
+						continue
+					}
+					entityInfo.files.push(
+						{
+							fileType: EntityFileType.bp_animation,
+							path: path
+						}
+					)
+				} else if (projectData.bp_animation_controllers[bp_animation] !== undefined) {
+					const path = projectData.bp_animation_controllers[bp_animation]
+					if (entityInfo.files.find((v) => v.path === path)) {
+						continue
+					}
+					entityInfo.files.push(
+						{
+							fileType: EntityFileType.bp_animation_controllers,
+							path: path
+						}
+					)
+				}
+			}
 		}
 		if (rp_entity) {
 			entityInfo.files.push(
@@ -328,32 +402,6 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 				entityInfo.files.push(
 					{
 						fileType: EntityFileType.rp_render_controllers,
-						path: path
-					}
-				)
-			}
-		}
-
-		for (const bp_animation of bp_entity.animations) {
-			if (projectData.bp_anims[bp_animation] !== undefined) {
-				const path = projectData.bp_anims[bp_animation]
-				if (entityInfo.files.find((v) => v.path === path)) {
-					continue
-				}
-				entityInfo.files.push(
-					{
-						fileType: EntityFileType.bp_animation,
-						path: path
-					}
-				)
-			} else if (projectData.bp_animation_controllers[bp_animation] !== undefined) {
-				const path = projectData.bp_animation_controllers[bp_animation]
-				if (entityInfo.files.find((v) => v.path === path)) {
-					continue
-				}
-				entityInfo.files.push(
-					{
-						fileType: EntityFileType.bp_animation_controllers,
 						path: path
 					}
 				)

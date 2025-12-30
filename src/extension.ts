@@ -54,8 +54,8 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 						vscode.window.showErrorMessage("Unexpected Error")
 						return []
 					}
-					const [_, behaviorPackDir] = getProjectInfo() ?? []
-					const entities = parseEntitiesInFolder(path.join(behaviorPackDir, "./entities/"), projectData, true)
+					const [resourcePackDir, behaviorPackDir] = getProjectInfo() ?? []
+					const entities = parseEntitiesInFolder("/", projectData, behaviorPackDir, resourcePackDir, true)
 					if (entities === undefined) {
 						return []
 					}

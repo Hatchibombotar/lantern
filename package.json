@@ -2,7 +2,7 @@
   "name": "bedrock-file-grouper",
   "displayName": "Bedrock Add-On File Grouper",
   "description": "An extension that adds a new view within the explorer which groups Minecraft Bedrock Add-On Files by identifier.",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.107.0"
   },
