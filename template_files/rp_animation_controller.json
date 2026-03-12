@@ -1,0 +1,22 @@
+{
+    "initial_state": "default",
+    "states": {
+        "default": {
+            "transitions": [
+                {
+                    "active": "q.foo"
+                }
+            ]
+        },
+        "active": {
+            "animations": [
+                "my_animation"
+            ],
+            "transitions": [
+                {
+                    "default": "q.bar"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "loop": false,
+    "animation_length": 1.5,
+    "timeline": {
+        "0.0": [
+            "@s namespace:my_event",
+            "/say hello!"
+        ]
+    }
+}

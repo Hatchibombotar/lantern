@@ -1,0 +1,25 @@
+{
+    "format_version": "1.XX.X",
+    "minecraft:client_entity": {
+        "description": {
+            "identifier": "namespace:identifier",
+            "materials": {
+                "default": "entity_alphatest"
+            },
+            "textures": {
+                "default": "textures/path/to/texture"
+            },
+            "geometry": {
+                "default": "geometry.my_entity"
+            },
+            "animations": {
+            },
+            "scripts": {
+                "animate": []
+            },
+            "render_controllers": [
+                "controller.render.default"
+            ]
+        }
+    }
+}

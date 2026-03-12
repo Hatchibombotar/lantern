@@ -24,6 +24,173 @@
           "name": "Grouped Add-On Files"
         }
       ]
+    },
+    "commands": [
+      {
+        "command": "extension.createEntity",
+        "title": "Create Entity"
+      },
+      {
+        "command": "extension.createItem",
+        "title": "Create Item"
+      },
+
+
+      {
+        "command": "extension.entityCopyIdentifier",
+        "title": "Copy Entity Identifier"
+      },
+
+      {
+        "command": "extension.entityCreateBPEntity",
+        "title": "Create BP Entity"
+      },
+      {
+        "command": "extension.entityCreateBPAnimation",
+        "title": "Create BP Animation"
+      },
+      {
+        "command": "extension.entityCreateBPAnimationController",
+        "title": "Create BP Animation Controller"
+      },
+
+      {
+        "command": "extension.entityCreateRPEntity",
+        "title": "Create RP Entity"
+      },
+      {
+        "command": "extension.entityCreateRPAnimation",
+        "title": "Create RP Animation"
+      },
+      {
+        "command": "extension.entityCreateRPAnimationController",
+        "title": "Create RP Animation Controller"
+      },
+      {
+        "command": "extension.entityCreateRPRenderController",
+        "title": "Create RP Render Controller"
+      },
+
+    
+      {
+        "command": "extension.itemCopyIdentifier",
+        "title": "Copy Item Identifier"
+      },
+
+      {
+        "command": "extension.itemCreateBPItem",
+        "title": "Create BP Item"
+      },
+
+      {
+        "command": "extension.itemAttachableCreateRPEntity",
+        "title": "Create Attachable"
+      },
+      {
+        "command": "extension.itemAttachableCreateRPAnimation",
+        "title": "Create Attachable Animation"
+      },
+      {
+        "command": "extension.itemAttachableCreateRPAnimationController",
+        "title": "Create Attachable Animation Controller"
+      },
+      {
+        "command": "extension.itemAttachableCreateRPRenderController",
+        "title": "Create Attachable Render Controller"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "extension.createEntity",
+          "when": "view == domainCollator && viewItem == folder_entities",
+          "group": "createEntity"
+        },
+        {
+          "command": "extension.createItem",
+          "when": "view == domainCollator && viewItem == folder_items",
+          "group": "createItem"
+        },
+
+
+        {
+          "command": "extension.entityCopyIdentifier",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "aboutEntity"
+        },
+
+        {
+          "command": "extension.entityCreateBPEntity",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "createEntityFileBP"
+        },
+        {
+          "command": "extension.entityCreateBPAnimation",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "createEntityFileBP"
+        },
+        {
+          "command": "extension.entityCreateBPAnimationController",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "createEntityFileBP"
+        },
+
+        {
+          "command": "extension.entityCreateRPEntity",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "createEntityFileRP"
+        },
+        {
+          "command": "extension.entityCreateRPAnimation",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "createEntityFileRP"
+        },
+        {
+          "command": "extension.entityCreateRPAnimationController",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "createEntityFileRP"
+        },
+        {
+          "command": "extension.entityCreateRPRenderController",
+          "when": "view == domainCollator && viewItem == node_entities",
+          "group": "createEntityFileRP"
+        },
+
+
+
+        {
+          "command": "extension.itemCopyIdentifier",
+          "when": "view == domainCollator && viewItem == node_items",
+          "group": "aboutItem"
+        },
+        {
+          "command": "extension.itemCreateBPItem",
+          "when": "view == domainCollator && viewItem == node_items",
+          "group": "createItemFileBP"
+        },
+
+
+        {
+          "command": "extension.itemAttachableCreateRPEntity",
+          "when": "view == domainCollator && viewItem == node_items",
+          "group": "createItemFileRP"
+        },
+        {
+          "command": "extension.itemAttachableCreateRPAnimation",
+          "when": "view == domainCollator && viewItem == node_items",
+          "group": "createItemFileRP"
+        },
+        {
+          "command": "extension.itemAttachableCreateRPAnimationController",
+          "when": "view == domainCollator && viewItem == node_items",
+          "group": "createItemFileRP"
+        },
+        {
+          "command": "extension.itemAttachableCreateRPRenderController",
+          "when": "view == domainCollator && viewItem == node_items",
+          "group": "createItemFileRP"
+        }
+      ]
     }
   },
   "scripts": {

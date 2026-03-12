@@ -1,0 +1,25 @@
+{
+    "initial_state": "default",
+    "states": {
+        "default": {
+            "transitions": [
+                {
+                    "active": "q.foo"
+                }
+            ]
+        },
+        "active": {
+            "on_entry": [
+                "@s namespace:my_event"
+            ],
+            "on_exit": [
+                "/say goodbye!"
+            ],
+            "transitions": [
+                {
+                    "default": "q.bar"
+                }
+            ]
+        }
+    }
+}

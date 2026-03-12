@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { entity_file_type_names, EntityInfo, Folder, getProjectInfo, isFolder, Node, parseEntitiesInFolder, parseItemsInFolder, parseProject, Root } from './parseProject';
+import { file_type_names, NodeInfo, Folder, getProjectDirectories, isFolder, Node, parseEntitiesInFolder, parseItemsInFolder, parseProject, Root } from './parseProject';
 import path from 'path';
+import registerAllCommands from './actions';
 
 export function activate(context: vscode.ExtensionContext) {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -17,6 +18,8 @@ export function activate(context: vscode.ExtensionContext) {
 	watcher.onDidChange(() => entityJsonTreeDataProvider.refresh());
 	watcher.onDidDelete(() => entityJsonTreeDataProvider.refresh());
 	context.subscriptions.push(watcher);
+
+	registerAllCommands(context)
 }
 
 class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -54,7 +57,7 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 						vscode.window.showErrorMessage("Unexpected Error")
 						return []
 					}
-					const [resourcePackDir, behaviorPackDir] = getProjectInfo() ?? []
+					const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
 					const entities = parseEntitiesInFolder("/", projectData, behaviorPackDir, resourcePackDir, true)
 					if (entities === undefined) {
 						return []
@@ -66,12 +69,12 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 						vscode.window.showErrorMessage("Unexpected Error")
 						return []
 					}
-					const [_, behaviorPackDir] = getProjectInfo() ?? []
-					const entities = parseItemsInFolder(path.join(behaviorPackDir, "./items/"), projectData, true)
-					if (entities === undefined) {
+					const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
+					const items = parseItemsInFolder("/", projectData, behaviorPackDir, resourcePackDir, true)
+					if (items === undefined) {
 						return []
 					}
-					return this.folderChildrenToTreeItems(entities, true)
+					return this.folderChildrenToTreeItems(items, true)
 				}
 			}
 			return []
@@ -85,6 +88,7 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 			`entities`,
 			vscode.TreeItemCollapsibleState.Collapsed
 		);
+		entities.contextValue = 'folder_entities';
 		(entities as any).__meta = {
 			type: "root",
 			rootType: "entities"
@@ -94,6 +98,7 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 			`items`,
 			vscode.TreeItemCollapsibleState.Collapsed
 		);
+		items.contextValue = 'folder_items';
 		(items as any).__meta = {
 			type: "root",
 			rootType: "items"
@@ -102,9 +107,9 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 		return [entities, items]
 	}
 
-	private entityToTreeItems(entity: EntityInfo): vscode.TreeItem[] {
+	private entityToTreeItems(entity: NodeInfo): vscode.TreeItem[] {
 		return entity.files.map(file => {
-			const fileTypeName = entity_file_type_names[file.fileType]
+			const fileTypeName = file_type_names[file.fileType]
 			if (!file.path) {
 				console.error("missing file path" + file.fileType + JSON.stringify(entity))
 				return null
@@ -134,6 +139,7 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 				}
 				item.iconPath = vscode.ThemeIcon.Folder;
 				(item as any).__meta = child;
+				item.contextValue = 'folder_' + child.category;
 				return item;
 			} else {
 				const item = new vscode.TreeItem(child.identifier, vscode.TreeItemCollapsibleState.Collapsed);
@@ -141,7 +147,7 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 					item.resourceUri = vscode.Uri.file(child.files[0].path);
 				}
 
-				item.contextValue = 'entityItem';
+				item.contextValue = 'node_' + child.category;
 				item.tooltip = child.identifier;
 				item.iconPath = vscode.ThemeIcon.File;
 				(item as any).__meta = child;

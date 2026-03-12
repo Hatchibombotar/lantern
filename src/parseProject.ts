@@ -4,25 +4,31 @@ import * as fs from 'fs';
 
 import * as JSONC from "jsonc-parser"
 
-export type Node = Folder | EntityInfo | Root
+export type Node = Root | Folder | NodeInfo
 
 export type Folder = {
 	type: "folder"
 	name: string
-	children: (EntityInfo | Folder)[]
+	path: string
+	children: (NodeInfo | Folder)[],
+	category: Category
 }
-export type EntityInfo = {
+export type NodeInfo = {
 	type: "entity",
 	identifier: string,
-	files: { fileType: EntityFileType, path: string }[]
+	path: string
+	files: { fileType: FileTypes, path: string }[],
+	category: Category
 }
+
+type Category = "entities" | "items"
 export type Root = {
 	type: "root",
-	rootType: "entities" | "items"
+	rootType: Category
 }
 
 // identifier: string
-// todo: make all values arrays to account for duplicates
+// TODO: make all values arrays to account for duplicates
 type ProjectData = {
 	// RP
 	"rp_entity": Record<string, {
@@ -49,7 +55,7 @@ type ProjectData = {
 	"bp_items": Record<string, string>,
 }
 
-enum EntityFileType {
+export enum FileTypes {
 	bp_entity,
 	rp_entity,
 	rp_animation,
@@ -61,19 +67,26 @@ enum EntityFileType {
 	rp_attachable,
 }
 
-export const entity_file_type_names: Record<EntityFileType, string> = {
-	[EntityFileType.bp_entity]: "bp/entities",
-	[EntityFileType.rp_entity]: "rp/entity",
-	[EntityFileType.rp_animation]: "rp/animations",
-	[EntityFileType.bp_animation]: "bp/animations",
-	[EntityFileType.rp_animation_controllers]: "rp/animation_controllers",
-	[EntityFileType.bp_animation_controllers]: "bp/animation_controllers",
-	[EntityFileType.rp_render_controllers]: "rp/render_controllers",
-	[EntityFileType.bp_items]: "bp/items",
-	[EntityFileType.rp_attachable]: "rp/attachables",
+export const file_type_names: Record<FileTypes, string> = {
+	[FileTypes.bp_entity]: "bp/entities",
+	[FileTypes.rp_entity]: "rp/entity",
+	[FileTypes.rp_animation]: "rp/animations",
+	[FileTypes.bp_animation]: "bp/animations",
+	[FileTypes.rp_animation_controllers]: "rp/animation_controllers",
+	[FileTypes.bp_animation_controllers]: "bp/animation_controllers",
+	[FileTypes.rp_render_controllers]: "rp/render_controllers",
+	[FileTypes.bp_items]: "bp/items",
+	[FileTypes.rp_attachable]: "rp/attachables",
 }
 
-export function getProjectInfo() {
+export function getMinEngineVersion() {
+	// TODO: make read manifest
+	// const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
+
+	return [1, 26, 0]
+}
+
+export function getProjectDirectories() {
 	const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 	if (rootPath === undefined) {
 		return
@@ -100,7 +113,7 @@ export function getProjectInfo() {
 }
 
 export function parseProject(): (ProjectData | void) {
-	const [resourcePackDir, behaviorPackDir] = getProjectInfo() ?? []
+	const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
 	if (resourcePackDir === undefined) {
 		return
 	}
@@ -256,7 +269,9 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 	const folder: Folder = {
 		type: "folder",
 		children: [],
-		name: folderPath.split("\\").at(-1) ?? "<folder>"
+		name: folderPath.split("\\").at(-1) ?? "<folder>",
+		category: "entities",
+		path: folderPath
 	}
 
 	const BPPath = path.join(behaviorPackDir, "./entities/", folderPath)
@@ -326,14 +341,16 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 		const bp_entity = projectData.bp_entity[identifier]
 		const rp_entity = projectData.rp_entity[identifier]
 
-		const entityInfo: EntityInfo = {
+		const entityInfo: NodeInfo = {
 			type: "entity",
 			identifier: identifier,
-			files: []
+			files: [],
+			category: "entities",
+			path: folderPath
 		}
 		if (bp_entity) {
 			entityInfo.files.push(
-				{ fileType: EntityFileType.bp_entity, path: bp_entity.path },
+				{ fileType: FileTypes.bp_entity, path: bp_entity.path },
 			)
 			for (const bp_animation of bp_entity.animations) {
 				if (projectData.bp_anims[bp_animation] !== undefined) {
@@ -343,7 +360,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 					}
 					entityInfo.files.push(
 						{
-							fileType: EntityFileType.bp_animation,
+							fileType: FileTypes.bp_animation,
 							path: path
 						}
 					)
@@ -354,7 +371,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 					}
 					entityInfo.files.push(
 						{
-							fileType: EntityFileType.bp_animation_controllers,
+							fileType: FileTypes.bp_animation_controllers,
 							path: path
 						}
 					)
@@ -363,7 +380,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 		}
 		if (rp_entity) {
 			entityInfo.files.push(
-				{ fileType: EntityFileType.rp_entity, path: rp_entity.path },
+				{ fileType: FileTypes.rp_entity, path: rp_entity.path },
 			)
 			for (const rp_animation of rp_entity.animations) {
 				if (projectData.rp_anims[rp_animation] !== undefined) {
@@ -373,7 +390,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 					}
 					entityInfo.files.push(
 						{
-							fileType: EntityFileType.rp_animation,
+							fileType: FileTypes.rp_animation,
 							path: path
 						}
 					)
@@ -384,7 +401,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 					}
 					entityInfo.files.push(
 						{
-							fileType: EntityFileType.rp_animation_controllers,
+							fileType: FileTypes.rp_animation_controllers,
 							path: path
 						}
 					)
@@ -401,7 +418,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 				}
 				entityInfo.files.push(
 					{
-						fileType: EntityFileType.rp_render_controllers,
+						fileType: FileTypes.rp_render_controllers,
 						path: path
 					}
 				)
@@ -421,24 +438,28 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 }
 
 
-export function parseItemsInFolder(folderPath: string, projectData: ProjectData, isRoot = false): Folder {
+export function parseItemsInFolder(folderPath: string, projectData: ProjectData, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
 		type: "folder",
 		children: [],
-		name: folderPath.split("\\").at(-1) ?? "<folder>"
+		name: folderPath.split("\\").at(-1) ?? "<folder>",
+		category: "items",
+		path: folderPath
 	}
 
-	for (const subfolder of fs.readdirSync(folderPath)) {
+	const BPPath = path.join(behaviorPackDir, "./items/", folderPath)
+
+	for (const subfolder of fs.readdirSync(BPPath)) {
 		const subfolderPath = path.join(folderPath, subfolder)
-		const stat = fs.statSync(subfolderPath)
+		const stat = fs.statSync(path.join(BPPath, subfolder))
 		if (stat.isDirectory()) {
 			folder.children.push(
-				parseItemsInFolder(subfolderPath, projectData)
+				parseItemsInFolder(subfolderPath, projectData, behaviorPackDir, resourcePackDir)
 			)
 		}
 	}
 
-	const BPItemFiles = fs.globSync(path.join(folderPath, "/*.json"))
+	const BPItemFiles = fs.globSync(path.join(BPPath, "/*.json"))
 	for (const BPItemFile of BPItemFiles) {
 		const [identifier, bp_item] = Object.entries(projectData.bp_items).find(([_, path]) => path === BPItemFile) ?? []
 
@@ -448,16 +469,18 @@ export function parseItemsInFolder(folderPath: string, projectData: ProjectData,
 
 		const attachable = projectData.rp_attachables[identifier]
 
-		const entityInfo: EntityInfo = {
+		const entityInfo: NodeInfo = {
 			type: "entity",
 			identifier: identifier,
 			files: [
-				{ fileType: EntityFileType.bp_items, path: BPItemFile },
-			]
+				{ fileType: FileTypes.bp_items, path: BPItemFile },
+			],
+			category: "items",
+			path: folderPath
 		}
 		if (attachable) {
 			entityInfo.files.push(
-				{ fileType: EntityFileType.rp_attachable, path: attachable.path },
+				{ fileType: FileTypes.rp_attachable, path: attachable.path },
 			)
 			for (const rp_animation of attachable.animations) {
 				if (projectData.rp_anims[rp_animation] !== undefined) {
@@ -467,7 +490,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ProjectData,
 					}
 					entityInfo.files.push(
 						{
-							fileType: EntityFileType.rp_animation,
+							fileType: FileTypes.rp_animation,
 							path: path
 						}
 					)
@@ -478,7 +501,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ProjectData,
 					}
 					entityInfo.files.push(
 						{
-							fileType: EntityFileType.rp_animation_controllers,
+							fileType: FileTypes.rp_animation_controllers,
 							path: path
 						}
 					)
@@ -495,7 +518,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ProjectData,
 				}
 				entityInfo.files.push(
 					{
-						fileType: EntityFileType.rp_render_controllers,
+						fileType: FileTypes.rp_render_controllers,
 						path: path
 					}
 				)
