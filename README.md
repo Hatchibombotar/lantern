@@ -1,13 +1,15 @@
 # Bedrock Add-On File Grouper
-An extension that adds a new view within the explorer which groups Minecraft Bedrock Add-On Files by identifier.
+Create add-ons efficiently by cutting out time scrolling through folders.
 
-In the below picture, it shows all files linked to the parrot in the vanilla packs. The group view is in the same panel as the exploere.
+This extension adds a new view within the explorer which groups Minecraft Bedrock Add-On Files by identifier.
 
-![Example](images/preview.png)
+In the below picture, it shows all files linked to the parrot in the vanilla packs. The group view is in the same panel as the explorer.
+
+![Example](./images/preview.png)
 
 In the below picture, it shows all files linked to the bat in the vanilla packs. The group view is in the secondary sidebar.
 
-![Example](images/preview-2.png)
+![Example](./images/preview-2.png)
 
 ## Groups
 The extension groups by the following files:

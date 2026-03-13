@@ -1,4 +1,9 @@
+import * as vscode from 'vscode';
 import * as JSONC from "jsonc-parser"
+import { FileTypes as FileType, Node, ProjectFile } from "./parseProject";
+import nodePath from "path"
+import * as fs from 'fs/promises';
+import { existsSync } from 'fs';
 
 // // Same as JSONC.modify, but creates all parent objects along the json path
 // function jsoncModifyWithInitialisedParents(text: string, path: JSONC.JSONPath, value: any) {
@@ -18,14 +23,14 @@ const formatSettings: JSONC.ModificationOptions = {
 }
 
 // Same as JSONC.modify, but creates all parent objects along the json path
-export function jsoncModifyandEditWithInitialisedParents(text: string, path: JSONC.JSONPath, value: any, isArrayInsertion: boolean=false) {
+export function jsoncModifyandEditWithInitialisedParents(text: string, path: JSONC.JSONPath, value: any, isArrayInsertion: boolean = false) {
     const parsedFile = JSONC.parse(text)
 
     let currentObject = parsedFile;
 
     // Iterate over the path to create parents if they don't exist
     for (let i = 0; i < path.length - 1; i++) {
-        const currentPath = path.slice(0, i+1)
+        const currentPath = path.slice(0, i + 1)
         currentObject = currentObject[path[i]]
 
         if (currentObject === undefined) {
@@ -38,7 +43,7 @@ export function jsoncModifyandEditWithInitialisedParents(text: string, path: JSO
     }
 
     text = JSONC.applyEdits(text,
-        JSONC.modify(text, path, value, {...formatSettings, isArrayInsertion})
+        JSONC.modify(text, path, value, { ...formatSettings, isArrayInsertion })
     )
 
     return text
@@ -64,4 +69,53 @@ export function objectModifyWithInitialisedParents(object: any, path: JSONC.JSON
     }
 
     return object; // Return the modified object
+}
+
+
+export function getFilesOfType(fileType: FileType, files: ProjectFile[]) {
+    return files.filter(x => x.fileType === fileType)
+}
+
+export async function readTemplate(context: vscode.ExtensionContext, template_name: string) {
+    const templatePath = nodePath.resolve(context.extensionPath, "template_files", template_name)
+    const templateFile = (await fs.readFile(templatePath)).toString()
+    const template = JSON.parse(templateFile)
+
+    return template
+}
+
+// pack: full path to RP or BP
+// folder: minmum location for file to be created e.g. "entities", "animations", etc.
+// idealSubfolder: the ideal location for the file to be created
+// fileName: the name for the file
+export async function findOrCreateDestinationPath(packDir: string, folder: string, idealSubfolder: string, fileName: string, extension: string) {
+    const minimumPath = nodePath.resolve(packDir, folder)
+    if (!existsSync(minimumPath)) {
+        await fs.mkdir(minimumPath)
+    }
+
+    const subfolderParts = idealSubfolder.split(nodePath.sep)
+    let finalSubfolder = minimumPath
+    for (const segment of subfolderParts) {
+        const newSubfolder = nodePath.resolve(finalSubfolder, segment)
+        if (!existsSync(newSubfolder)) {
+            break
+        }
+        finalSubfolder = newSubfolder
+    }
+
+    const finalPath = nodePath.resolve(finalSubfolder, fileName + extension)
+    if (existsSync(finalPath)) {
+        let i = 1;
+        while (true) {
+            const finalPath = nodePath.resolve(finalSubfolder, fileName + "_" + i + extension)
+            if (!existsSync(finalPath)) {
+                return finalPath
+            }
+            i++
+        }
+    } else {
+        return finalPath
+    }
+
 }

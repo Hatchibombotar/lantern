@@ -1,8 +1,9 @@
 {
   "name": "bedrock-file-grouper",
   "displayName": "Bedrock Add-On File Grouper",
-  "description": "An extension that adds a new view within the explorer which groups Minecraft Bedrock Add-On Files by identifier.",
-  "version": "0.1.0",
+  "description": "Create add-ons efficiently by cutting out time scrolling through folders.",
+  "icon": "images/icon.png",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -12,6 +13,7 @@
     "Visualization"
   ],
   "repository": {
+    "type": "git",
     "url": "https://github.com/Hatchibombotar/bedrock-file-grouper"
   },
   "activationEvents": [ ],
@@ -27,131 +29,131 @@
     },
     "commands": [
       {
-        "command": "extension.createEntity",
+        "command": "domainCollator.createEntity",
         "title": "Create Entity"
       },
       {
-        "command": "extension.createItem",
+        "command": "domainCollator.createItem",
         "title": "Create Item"
       },
 
 
       {
-        "command": "extension.entityCopyIdentifier",
+        "command": "domainCollator.entityCopyIdentifier",
         "title": "Copy Entity Identifier"
       },
 
       {
-        "command": "extension.entityCreateBPEntity",
+        "command": "domainCollator.entityCreateBPEntity",
         "title": "Create BP Entity"
       },
       {
-        "command": "extension.entityCreateBPAnimation",
+        "command": "domainCollator.entityCreateBPAnimation",
         "title": "Create BP Animation"
       },
       {
-        "command": "extension.entityCreateBPAnimationController",
+        "command": "domainCollator.entityCreateBPAnimationController",
         "title": "Create BP Animation Controller"
       },
 
       {
-        "command": "extension.entityCreateRPEntity",
+        "command": "domainCollator.entityCreateRPEntity",
         "title": "Create RP Entity"
       },
       {
-        "command": "extension.entityCreateRPAnimation",
+        "command": "domainCollator.entityCreateRPAnimation",
         "title": "Create RP Animation"
       },
       {
-        "command": "extension.entityCreateRPAnimationController",
+        "command": "domainCollator.entityCreateRPAnimationController",
         "title": "Create RP Animation Controller"
       },
       {
-        "command": "extension.entityCreateRPRenderController",
+        "command": "domainCollator.entityCreateRPRenderController",
         "title": "Create RP Render Controller"
       },
 
     
       {
-        "command": "extension.itemCopyIdentifier",
+        "command": "domainCollator.itemCopyIdentifier",
         "title": "Copy Item Identifier"
       },
 
       {
-        "command": "extension.itemCreateBPItem",
+        "command": "domainCollator.itemCreateBPItem",
         "title": "Create BP Item"
       },
 
       {
-        "command": "extension.itemAttachableCreateRPEntity",
+        "command": "domainCollator.itemAttachableCreateRPEntity",
         "title": "Create Attachable"
       },
       {
-        "command": "extension.itemAttachableCreateRPAnimation",
+        "command": "domainCollator.itemAttachableCreateRPAnimation",
         "title": "Create Attachable Animation"
       },
       {
-        "command": "extension.itemAttachableCreateRPAnimationController",
+        "command": "domainCollator.itemAttachableCreateRPAnimationController",
         "title": "Create Attachable Animation Controller"
       },
       {
-        "command": "extension.itemAttachableCreateRPRenderController",
+        "command": "domainCollator.itemAttachableCreateRPRenderController",
         "title": "Create Attachable Render Controller"
       }
     ],
     "menus": {
       "view/item/context": [
         {
-          "command": "extension.createEntity",
+          "command": "domainCollator.createEntity",
           "when": "view == domainCollator && viewItem == folder_entities",
           "group": "createEntity"
         },
         {
-          "command": "extension.createItem",
+          "command": "domainCollator.createItem",
           "when": "view == domainCollator && viewItem == folder_items",
           "group": "createItem"
         },
 
 
         {
-          "command": "extension.entityCopyIdentifier",
+          "command": "domainCollator.entityCopyIdentifier",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "aboutEntity"
         },
 
         {
-          "command": "extension.entityCreateBPEntity",
+          "command": "domainCollator.entityCreateBPEntity",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "createEntityFileBP"
         },
         {
-          "command": "extension.entityCreateBPAnimation",
+          "command": "domainCollator.entityCreateBPAnimation",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "createEntityFileBP"
         },
         {
-          "command": "extension.entityCreateBPAnimationController",
+          "command": "domainCollator.entityCreateBPAnimationController",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "createEntityFileBP"
         },
 
         {
-          "command": "extension.entityCreateRPEntity",
+          "command": "domainCollator.entityCreateRPEntity",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
         {
-          "command": "extension.entityCreateRPAnimation",
+          "command": "domainCollator.entityCreateRPAnimation",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
         {
-          "command": "extension.entityCreateRPAnimationController",
+          "command": "domainCollator.entityCreateRPAnimationController",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
         {
-          "command": "extension.entityCreateRPRenderController",
+          "command": "domainCollator.entityCreateRPRenderController",
           "when": "view == domainCollator && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
@@ -159,34 +161,34 @@
 
 
         {
-          "command": "extension.itemCopyIdentifier",
+          "command": "domainCollator.itemCopyIdentifier",
           "when": "view == domainCollator && viewItem == node_items",
           "group": "aboutItem"
         },
         {
-          "command": "extension.itemCreateBPItem",
+          "command": "domainCollator.itemCreateBPItem",
           "when": "view == domainCollator && viewItem == node_items",
           "group": "createItemFileBP"
         },
 
 
         {
-          "command": "extension.itemAttachableCreateRPEntity",
+          "command": "domainCollator.itemAttachableCreateRPEntity",
           "when": "view == domainCollator && viewItem == node_items",
           "group": "createItemFileRP"
         },
         {
-          "command": "extension.itemAttachableCreateRPAnimation",
+          "command": "domainCollator.itemAttachableCreateRPAnimation",
           "when": "view == domainCollator && viewItem == node_items",
           "group": "createItemFileRP"
         },
         {
-          "command": "extension.itemAttachableCreateRPAnimationController",
+          "command": "domainCollator.itemAttachableCreateRPAnimationController",
           "when": "view == domainCollator && viewItem == node_items",
           "group": "createItemFileRP"
         },
         {
-          "command": "extension.itemAttachableCreateRPRenderController",
+          "command": "domainCollator.itemAttachableCreateRPRenderController",
           "when": "view == domainCollator && viewItem == node_items",
           "group": "createItemFileRP"
         }

@@ -1,11 +1,10 @@
 import * as vscode from 'vscode';
-import { existsSync } from 'fs';
 import * as fs from 'fs/promises';
 import * as nodePath from 'path';
 import * as JSONC from "jsonc-parser"
 
-import { FileTypes, getMinEngineVersion, getProjectDirectories, isFolder, Node, NodeInfo } from './parseProject';
-import { jsoncModifyandEditWithInitialisedParents, objectModifyWithInitialisedParents } from './utils';
+import { FileTypes, getProjectData, Node, NodeInfo } from './parseProject';
+import { findOrCreateDestinationPath, getFilesOfType, jsoncModifyandEditWithInitialisedParents as jsoncModify, objectModifyWithInitialisedParents, readTemplate } from './utils';
 
 export default function registerAllCommands(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -29,7 +28,7 @@ export default function registerAllCommands(context: vscode.ExtensionContext) {
 }
 
 function createEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.createEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.createEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         let folderPath = ""
@@ -46,41 +45,28 @@ function createEntity(context: vscode.ExtensionContext) {
                 return isInvalid ? "Invalid identifier, must be in format 'namespace:entity_name'" : null;
             },
         });
-        if (identifier === undefined) {
-            return
-        }
+        if (identifier === undefined) return
 
-        const [_, entity_name] = identifier.trim().split(":")
+        const entityName = identifier.trim().split(":")[1]
 
         const options = ["Full Entity", "Entity (RP Only)", "Entity (BP Only)"]
         const result = await vscode.window.showQuickPick(options, {
             placeHolder: 'Entity Type',
         });
 
-        const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
-
-        const minEngineVersion = getMinEngineVersion()
-        const formatVersionString = minEngineVersion.join(".")
-
-        // fs.writeFile()
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, behaviorPackDir, defaultFormatVersion } = projectData
 
         const hasRPFile = result === options[0] || result === options[1]
         const hasBPFile = result === options[0] || result === options[2]
 
         if (hasBPFile) {
-            const bpEntityTemplatePath = nodePath.resolve(context.extensionPath, "template_files/bp_entity.json")
-            const bpEntityTemplateFile = (await fs.readFile(bpEntityTemplatePath)).toString()
-            const bpEntityTemplate = JSON.parse(bpEntityTemplateFile)
-
+            const bpEntityTemplate = await readTemplate(context, "bp_entity.json")
             bpEntityTemplate["minecraft:entity"].description.identifier = identifier
-            bpEntityTemplate.format_version = formatVersionString
+            bpEntityTemplate.format_version = defaultFormatVersion
 
-            const bpEntityDestinationPath = nodePath.resolve(behaviorPackDir, "entities", folderPath, `${entity_name}.json`)
-
-            if (existsSync(bpEntityDestinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + bpEntityDestinationPath);
-                return
-            }
+            const bpEntityDestinationPath = await findOrCreateDestinationPath(behaviorPackDir, "entities", folderPath, entityName, ".json")
 
             await fs.writeFile(bpEntityDestinationPath, JSON.stringify(bpEntityTemplate, null, 4))
 
@@ -88,19 +74,11 @@ function createEntity(context: vscode.ExtensionContext) {
         }
 
         if (hasRPFile) {
-            const rpEntityTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_entity.json")
-            const rpEntityTemplateFile = (await fs.readFile(rpEntityTemplatePath)).toString()
-            const rpEntityTemplate = JSON.parse(rpEntityTemplateFile)
-
+            const rpEntityTemplate = await readTemplate(context, "rp_entity.json")
             rpEntityTemplate["minecraft:client_entity"].description.identifier = identifier
-            rpEntityTemplate.format_version = formatVersionString
+            rpEntityTemplate.format_version = defaultFormatVersion
 
-            const rpEntityDestinationPath = nodePath.resolve(resourcePackDir, "entity", folderPath, `${entity_name}.json`)
-
-            if (existsSync(rpEntityDestinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + rpEntityDestinationPath);
-                return
-            }
+            const rpEntityDestinationPath = await findOrCreateDestinationPath(resourcePackDir, "entity", folderPath, entityName, ".json")
 
             await fs.writeFile(rpEntityDestinationPath, JSON.stringify(rpEntityTemplate, null, 4))
 
@@ -110,11 +88,45 @@ function createEntity(context: vscode.ExtensionContext) {
 }
 
 function createItem(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.createItem", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.createItem", async (element: vscode.TreeItem) => {
+        const meta = (element as any).__meta as (Node) | undefined;
+
+        let folderPath = ""
+        if (meta?.type === "folder") {
+            folderPath = "." + meta.path
+        }
+
+        const identifier = await vscode.window.showInputBox({
+            placeHolder: 'e.g. identifier:item_name',
+            validateInput: text => {
+                text = text.trim()
+                const split = text.split(":")
+                const isInvalid = split.length !== 2
+                return isInvalid ? "Invalid identifier, must be in format 'namespace:item_name'" : null;
+            },
+        });
+        if (identifier === undefined) return
+
+        const entityName = identifier.trim().split(":")[1]
+
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { behaviorPackDir, defaultFormatVersion } = projectData
+
+
+        const template = await readTemplate(context, "bp_item.json")
+        template["minecraft:item"].description.identifier = identifier
+        template.format_version = defaultFormatVersion
+
+        const bpEntityDestinationPath = await findOrCreateDestinationPath(behaviorPackDir, "items", folderPath, entityName, ".json")
+
+        await fs.writeFile(bpEntityDestinationPath, JSON.stringify(template, null, 4))
+
+        vscode.window.showInformationMessage(`Successfully created BP item.`)
     })
 }
 function entityCopyIdentifier(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.entityCopyIdentifier", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCopyIdentifier", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type === "entity") {
             vscode.env.clipboard.writeText(meta.identifier)
@@ -123,68 +135,49 @@ function entityCopyIdentifier(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateBPEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.entityCreateBPEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCreateBPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "entities") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.bp_entity) {
-                vscode.window.showInformationMessage(`BP entity already exits for entity ${meta.identifier}`)
-                return
-            }
+        const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
+        if (bpEntityFile !== undefined) {
+            vscode.window.showInformationMessage(`BP entity already exits for entity ${meta.identifier}`)
+            return
         }
         const folderPath = "." + meta.path
-        const [_namespace, entity_name] = meta.identifier.trim().split(":")
+        const [_, entityName] = meta.identifier.trim().split(":")
 
-        const [_resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { behaviorPackDir, defaultFormatVersion } = projectData
 
-        const minEngineVersion = getMinEngineVersion()
-        const formatVersionString = minEngineVersion.join(".")
-
-        const bpEntityTemplatePath = nodePath.resolve(context.extensionPath, "template_files/bp_entity.json")
-        const bpEntityTemplateFile = (await fs.readFile(bpEntityTemplatePath)).toString()
-        const bpEntityTemplate = JSON.parse(bpEntityTemplateFile)
+        const bpEntityTemplate = await readTemplate(context, "bp_entity.json")
 
         bpEntityTemplate["minecraft:entity"].description.identifier = meta.identifier
-        bpEntityTemplate.format_version = formatVersionString
+        bpEntityTemplate.format_version = defaultFormatVersion
 
-        const bpEntityDestinationPath = nodePath.resolve(behaviorPackDir, "entities", folderPath, `${entity_name}.json`)
-
-        if (existsSync(bpEntityDestinationPath)) {
-            vscode.window.showErrorMessage("File already exists: " + bpEntityDestinationPath);
-            return
-        }
+        const bpEntityDestinationPath = await findOrCreateDestinationPath(behaviorPackDir, "entities", folderPath, entityName, ".json")
 
         await fs.writeFile(bpEntityDestinationPath, JSON.stringify(bpEntityTemplate, null, 4))
-
         vscode.window.showInformationMessage(`Successfully created BP entity.`)
     })
 }
 function entityCreateBPAnimation(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.entityCreateBPAnimation", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCreateBPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingBPAnimations = []
-        let bpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.bp_entity) {
-                bpEntityFile = file
-            } else if (file.fileType === FileTypes.bp_animation) {
-                existingBPAnimations.push(file)
-            }
-        }
+        const existingBPAnimations = getFilesOfType(FileTypes.bp_animation, meta.files)
+        const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
+
         if (!bpEntityFile) {
-            vscode.window.showInformationMessage(`BP entity does not exist for entity ${meta.identifier}`)
-            return
+            return vscode.window.showInformationMessage(`BP entity does not exist for entity ${meta.identifier}`)
         }
 
-        const [_resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { behaviorPackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingBPAnimations.length === 0
         let existingFile: NodeInfo["files"][0] | undefined;
@@ -223,9 +216,9 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
         const bpEntity = (await fs.readFile(bpEntityFile.path)).toString()
         let parsedBPEntity = JSONC.parse(bpEntity)
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const initialAnimationIdentifier = `animation.${namespace}.${entity_name}.`
+        const initialAnimationIdentifier = `animation.${namespace}.${entityName}.`
 
         const animationIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. animation.namespace.entity.my_anim',
@@ -264,28 +257,15 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
         })()
 
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/bp_single_animation.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "bp_single_animation.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/bp_animation_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "bp_animation_root.json")
 
             rootTemplate.animations[animationIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(behaviorPackDir, "animations", `${animationShortName}.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(behaviorPackDir, "animations", "", animationShortName, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -294,14 +274,14 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
                 return
             }
             const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingAnimationFile,
+            const result = jsoncModify(existingAnimationFile,
                 ["animations", animationIdentifier],
                 template,
             )
             fs.writeFile(existingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(bpEntity,
+        const result = jsoncModify(bpEntity,
             ["minecraft:entity", "description", "animations", animationShortName],
             animationIdentifier,
         )
@@ -313,28 +293,22 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
 function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
     // very similar to entityCreateBPAnimation
 
-    return vscode.commands.registerCommand("extension.entityCreateBPAnimationController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCreateBPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingBPAnimationControllers = []
-        let bpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.bp_entity) {
-                bpEntityFile = file
-            } else if (file.fileType === FileTypes.bp_animation_controllers) {
-                existingBPAnimationControllers.push(file)
-            }
-        }
+        const existingBPAnimationControllers = getFilesOfType(FileTypes.bp_animation_controllers, meta.files)
+        const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
+
         if (!bpEntityFile) {
             vscode.window.showInformationMessage(`BP entity does not exist for entity ${meta.identifier}`)
             return
         }
 
-        const [_resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { behaviorPackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingBPAnimationControllers.length === 0
         let existingFile: NodeInfo["files"][0] | undefined;
@@ -373,9 +347,9 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
         const bpEntity = (await fs.readFile(bpEntityFile.path)).toString()
         let parsedBPEntity = JSONC.parse(bpEntity)
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const initialAnimationIdentifier = `controller.animation.${namespace}.${entity_name}.`
+        const initialAnimationIdentifier = `controller.animation.${namespace}.${entityName}.`
 
         const animationIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. controller.animation.namespace.entity.my_ac',
@@ -414,28 +388,15 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
         })()
 
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/bp_animation_controller.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "bp_animation_controller.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/bp_animation_controller_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "bp_animation_controller_root.json")
 
             rootTemplate.animation_controllers[animationIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(behaviorPackDir, "animation_controllers", `${animationShortName}.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(behaviorPackDir, "animation_controllers", "", animationShortName, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -444,14 +405,14 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
                 return
             }
             const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingAnimationFile,
+            const result = jsoncModify(existingAnimationFile,
                 ["animation_controllers", animationIdentifier],
                 template,
             )
             fs.writeFile(existingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(bpEntity,
+        const result = jsoncModify(bpEntity,
             ["minecraft:entity", "description", "animations", animationShortName],
             animationIdentifier,
         )
@@ -461,11 +422,9 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateRPEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.entityCreateRPEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCreateRPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "entities") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         for (const file of meta.files) {
             if (file.fileType === FileTypes.rp_entity) {
@@ -473,28 +432,19 @@ function entityCreateRPEntity(context: vscode.ExtensionContext) {
                 return
             }
         }
-        console.log(meta.path)
         const folderPath = "." + meta.path
-        const [_namespace, entity_name] = meta.identifier.trim().split(":")
+        const [_namespace, entityName] = meta.identifier.trim().split(":")
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
-        const minEngineVersion = getMinEngineVersion()
-        const formatVersionString = minEngineVersion.join(".")
-
-        const rpEntityTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_entity.json")
-        const rpEntityTemplateFile = (await fs.readFile(rpEntityTemplatePath)).toString()
-        const rpEntityTemplate = JSON.parse(rpEntityTemplateFile)
+        const rpEntityTemplate = await readTemplate(context, "rp_entity.json")
 
         rpEntityTemplate["minecraft:client_entity"].description.identifier = meta.identifier
-        rpEntityTemplate.format_version = formatVersionString
+        rpEntityTemplate.format_version = defaultFormatVersion
 
-        const rpEntityDestinationPath = nodePath.resolve(resourcePackDir, "entity", folderPath, `${entity_name}.json`)
-
-        if (existsSync(rpEntityDestinationPath)) {
-            vscode.window.showErrorMessage("File already exists: " + rpEntityDestinationPath);
-            return
-        }
+        const rpEntityDestinationPath = await findOrCreateDestinationPath(resourcePackDir, "entity", folderPath, entityName, ".json")
 
         await fs.writeFile(rpEntityDestinationPath, JSON.stringify(rpEntityTemplate, null, 4))
 
@@ -502,28 +452,22 @@ function entityCreateRPEntity(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateRPAnimation(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.entityCreateRPAnimation", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCreateRPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingRPAnimations = []
-        let rpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_entity) {
-                rpEntityFile = file
-            } else if (file.fileType === FileTypes.rp_animation) {
-                existingRPAnimations.push(file)
-            }
-        }
+        const existingRPAnimations = getFilesOfType(FileTypes.rp_animation, meta.files)
+        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
             return
         }
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingRPAnimations.length === 0
         let existingFile: NodeInfo["files"][0] | undefined;
@@ -562,9 +506,9 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
         const entity = (await fs.readFile(rpEntityFile.path)).toString()
         let parsedEntity = JSONC.parse(entity)
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const initialAnimationIdentifier = `animation.${namespace}.${entity_name}.`
+        const initialAnimationIdentifier = `animation.${namespace}.${entityName}.`
 
         const animationIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. animation.namespace.entity.my_anim',
@@ -603,28 +547,15 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
         })()
 
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/rp_single_animation.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "rp_single_animation.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_animation_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "rp_animation_root.json")
 
             rootTemplate.animations[animationIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(resourcePackDir, "animations", `${animationShortName}.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(resourcePackDir, "animations", "", animationShortName, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -633,14 +564,14 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
                 return
             }
             const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingAnimationFile,
+            const result = jsoncModify(existingAnimationFile,
                 ["animations", animationIdentifier],
                 template,
             )
             fs.writeFile(existingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(entity,
+        const result = jsoncModify(entity,
             ["minecraft:client_entity", "description", "animations", animationShortName],
             animationIdentifier,
         )
@@ -650,28 +581,22 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.entityCreateRPAnimationController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCreateRPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingRPAnimationControllers = []
-        let rpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_entity) {
-                rpEntityFile = file
-            } else if (file.fileType === FileTypes.rp_animation_controllers) {
-                existingRPAnimationControllers.push(file)
-            }
-        }
+        const existingRPAnimationControllers = getFilesOfType(FileTypes.rp_animation_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
             return
         }
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingRPAnimationControllers.length === 0
         let existingFile: NodeInfo["files"][0] | undefined;
@@ -710,9 +635,9 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
         const entity = (await fs.readFile(rpEntityFile.path)).toString()
         let parsedEntity = JSONC.parse(entity)
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const initialAnimationIdentifier = `controller.animation.${namespace}.${entity_name}.`
+        const initialAnimationIdentifier = `controller.animation.${namespace}.${entityName}.`
 
         const animationIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. controller.animation.namespace.entity.my_anim',
@@ -751,28 +676,15 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
         })()
 
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/rp_animation_controller.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "rp_animation_controller.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_animation_controller_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "rp_animation_controller_root.json")
 
             rootTemplate.animation_controllers[animationIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(resourcePackDir, "animation_controllers", `${animationShortName}.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(resourcePackDir, "animation_controllers", "", animationShortName, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -781,14 +693,14 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
                 return
             }
             const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingAnimationFile,
+            const result = jsoncModify(existingAnimationFile,
                 ["animation_controllers", animationIdentifier],
                 template,
             )
             fs.writeFile(existingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(entity,
+        const result = jsoncModify(entity,
             ["minecraft:client_entity", "description", "animations", animationShortName],
             animationIdentifier,
         )
@@ -798,28 +710,22 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateRPRenderController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.entityCreateRPRenderController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.entityCreateRPRenderController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingRPRenderControllers = []
-        let rpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_entity) {
-                rpEntityFile = file
-            } else if (file.fileType === FileTypes.rp_render_controllers) {
-                existingRPRenderControllers.push(file)
-            }
-        }
+        const existingRPRenderControllers = getFilesOfType(FileTypes.rp_render_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
             return
         }
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingRPRenderControllers.length === 0
         let hasExistingFile: NodeInfo["files"][0] | undefined;
@@ -856,10 +762,9 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
         }
 
         const entity = (await fs.readFile(rpEntityFile.path)).toString()
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
-
-        const initialRenderControllerIdentifier = `controller.render.${namespace}.${entity_name}.`
+        const initialRenderControllerIdentifier = `controller.render.${namespace}.${entityName}.`
 
         const rcIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. controller.render.namespace.my_entity.thing',
@@ -871,28 +776,15 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
             return
         }
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/rp_render_controller.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "rp_render_controller.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_render_controller_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "rp_render_controller_root.json")
 
             rootTemplate.render_controllers[rcIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(resourcePackDir, "render_controllers", `${entity_name}.render_controller.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(resourcePackDir, "render_controllers", "", `${entityName}.render_controller`, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -901,14 +793,14 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
                 return
             }
             const existingFile = (await fs.readFile(hasExistingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingFile,
+            const result = jsoncModify(existingFile,
                 ["render_controllers", rcIdentifier],
                 template,
             )
             fs.writeFile(hasExistingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(entity,
+        const result = jsoncModify(entity,
             ["minecraft:client_entity", "description", "render_controllers", -1],
             rcIdentifier,
             true
@@ -919,7 +811,7 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
     })
 }
 function itemCopyIdentifier() {
-    return vscode.commands.registerCommand("extension.itemCopyIdentifier", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.itemCopyIdentifier", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type === "entity") {
             vscode.env.clipboard.writeText(meta.identifier)
@@ -928,39 +820,28 @@ function itemCopyIdentifier() {
     })
 }
 function itemCreateBPItem(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.itemCreateBPItem", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.itemCreateBPItem", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "items") {
+        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
+
+        const bpItem = getFilesOfType(FileTypes.bp_items, meta.files)[0]
+        if (bpItem !== undefined) {
+            vscode.window.showInformationMessage(`BP item already exits for entity ${meta.identifier}`)
             return
         }
 
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.bp_items) {
-                vscode.window.showInformationMessage(`BP item already exits for entity ${meta.identifier}`)
-                return
-            }
-        }
         const folderPath = "." + meta.path
-        const [_namespace, entity_name] = meta.identifier.trim().split(":")
+        const [_, entityName] = meta.identifier.trim().split(":")
 
-        const [_resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { behaviorPackDir, defaultFormatVersion } = projectData
 
-        const minEngineVersion = getMinEngineVersion()
-        const formatVersionString = minEngineVersion.join(".")
-
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/bp_item.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
-
+        const template = await readTemplate(context, "bp_item.json")
         template["minecraft:item"].description.identifier = meta.identifier
-        template.format_version = formatVersionString
+        template.format_version = defaultFormatVersion
 
-        const destinationPath = nodePath.resolve(behaviorPackDir, "items", folderPath, `${entity_name}.json`)
-
-        if (existsSync(destinationPath)) {
-            vscode.window.showErrorMessage("File already exists: " + destinationPath);
-            return
-        }
+        const destinationPath = await findOrCreateDestinationPath(behaviorPackDir, "items", folderPath, entityName, ".json")
 
         await fs.writeFile(destinationPath, JSON.stringify(template, null, 4))
 
@@ -968,11 +849,9 @@ function itemCreateBPItem(context: vscode.ExtensionContext) {
     })
 }
 function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.itemAttachableCreateRPEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "items") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
 
         for (const file of meta.files) {
             if (file.fileType === FileTypes.rp_entity) {
@@ -981,27 +860,18 @@ function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
             }
         }
         const folderPath = "." + meta.path
-        console.log(meta.path)
-        const [_namespace, entity_name] = meta.identifier.trim().split(":")
+        const entityName = meta.identifier.trim().split(":")[1]
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
-        const minEngineVersion = getMinEngineVersion()
-        const formatVersionString = minEngineVersion.join(".")
-
-        const rpEntityTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_attachable.json")
-        const rpEntityTemplateFile = (await fs.readFile(rpEntityTemplatePath)).toString()
-        const rpEntityTemplate = JSON.parse(rpEntityTemplateFile)
+        const rpEntityTemplate = await readTemplate(context, "rp_attachable.json")
 
         rpEntityTemplate["minecraft:attachable"].description.identifier = meta.identifier
-        rpEntityTemplate.format_version = formatVersionString
+        rpEntityTemplate.format_version = defaultFormatVersion
 
-        const rpEntityDestinationPath = nodePath.resolve(resourcePackDir, "attachables", folderPath, `${entity_name}.json`)
-
-        if (existsSync(rpEntityDestinationPath)) {
-            vscode.window.showErrorMessage("File already exists: " + rpEntityDestinationPath);
-            return
-        }
+        const rpEntityDestinationPath = await findOrCreateDestinationPath(resourcePackDir, "attachables", folderPath, entityName, ".json")
 
         await fs.writeFile(rpEntityDestinationPath, JSON.stringify(rpEntityTemplate, null, 4))
 
@@ -1009,28 +879,22 @@ function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
     })
 }
 function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.itemAttachableCreateRPAnimation", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "items") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
 
-        const existingRPAnimations = []
-        let rpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_attachable) {
-                rpEntityFile = file
-            } else if (file.fileType === FileTypes.rp_animation) {
-                existingRPAnimations.push(file)
-            }
-        }
+        const existingRPAnimations = getFilesOfType(FileTypes.rp_animation, meta.files)
+        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
             return
         }
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingRPAnimations.length === 0
         let existingFile: NodeInfo["files"][0] | undefined;
@@ -1069,9 +933,9 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
         const entity = (await fs.readFile(rpEntityFile.path)).toString()
         let parsedEntity = JSONC.parse(entity)
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const initialAnimationIdentifier = `animation.${namespace}.${entity_name}.`
+        const initialAnimationIdentifier = `animation.${namespace}.${entityName}.`
 
         const animationIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. animation.namespace.entity.my_anim',
@@ -1110,28 +974,15 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
         })()
 
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/rp_single_animation.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "rp_single_animation.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_animation_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "rp_animation_root.json")
 
             rootTemplate.animations[animationIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(resourcePackDir, "animations", `${animationShortName}.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(resourcePackDir, "animations", "", animationShortName, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -1140,14 +991,14 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
                 return
             }
             const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingAnimationFile,
+            const result = jsoncModify(existingAnimationFile,
                 ["animations", animationIdentifier],
                 template,
             )
             fs.writeFile(existingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(entity,
+        const result = jsoncModify(entity,
             ["minecraft:attachable", "description", "animations", animationShortName],
             animationIdentifier,
         )
@@ -1157,28 +1008,22 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
     })
 }
 function itemAttachableCreateRPAnimationController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.itemAttachableCreateRPAnimationController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "items") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
 
-        const existingRPAnimationControllers = []
-        let rpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_attachable) {
-                rpEntityFile = file
-            } else if (file.fileType === FileTypes.rp_animation_controllers) {
-                existingRPAnimationControllers.push(file)
-            }
-        }
+        const existingRPAnimationControllers = getFilesOfType(FileTypes.rp_animation_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for item ${meta.identifier}`)
             return
         }
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingRPAnimationControllers.length === 0
         let existingFile: NodeInfo["files"][0] | undefined;
@@ -1217,9 +1062,9 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
         const entity = (await fs.readFile(rpEntityFile.path)).toString()
         let parsedEntity = JSONC.parse(entity)
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const initialAnimationIdentifier = `controller.animation.${namespace}.${entity_name}.`
+        const initialAnimationIdentifier = `controller.animation.${namespace}.${entityName}.`
 
         const animationIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. controller.animation.namespace.entity.my_anim',
@@ -1258,28 +1103,15 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
         })()
 
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/rp_animation_controller.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "rp_animation_controller.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_animation_controller_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "rp_animation_controller_root.json")
 
             rootTemplate.animation_controllers[animationIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(resourcePackDir, "animation_controllers", `${animationShortName}.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(resourcePackDir, "animation_controllers", "", animationShortName, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -1288,14 +1120,14 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
                 return
             }
             const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingAnimationFile,
+            const result = jsoncModify(existingAnimationFile,
                 ["animation_controllers", animationIdentifier],
                 template,
             )
             fs.writeFile(existingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(entity,
+        const result = jsoncModify(entity,
             ["minecraft:attachable", "description", "animations", animationShortName],
             animationIdentifier,
         )
@@ -1305,28 +1137,22 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
     })
 }
 function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("extension.itemAttachableCreateRPRenderController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPRenderController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "items") {
-            return
-        }
+        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
 
-        const existingRPRenderControllers = []
-        let rpEntityFile: NodeInfo["files"][0] | undefined;
-        for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_attachable) {
-                rpEntityFile = file
-            } else if (file.fileType === FileTypes.rp_render_controllers) {
-                existingRPRenderControllers.push(file)
-            }
-        }
+        const existingRPRenderControllers = getFilesOfType(FileTypes.rp_render_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
             return
         }
 
-        const [resourcePackDir, _behaviorPackDir] = getProjectDirectories() ?? []
+        const projectData = getProjectData()
+        if (projectData === undefined) return
+        const { resourcePackDir, defaultFormatVersion } = projectData
 
         let shouldCreateFileFromScratch = existingRPRenderControllers.length === 0
         let hasExistingFile: NodeInfo["files"][0] | undefined;
@@ -1338,7 +1164,6 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
                     description: nodePath.relative(resourcePackDir, x.path)
                 } as vscode.QuickPickItem))
             )
-
 
             fileDestinationOptions.push({
                 "label": "New File",
@@ -1364,10 +1189,9 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
 
         const entity = (await fs.readFile(rpEntityFile.path)).toString()
 
-        const [namespace, entity_name] = meta.identifier.trim().split(":")
+        const [namespace, entityName] = meta.identifier.trim().split(":")
 
-        const initialRenderControllerIdentifier = `controller.render.${namespace}.${entity_name}.`
-
+        const initialRenderControllerIdentifier = `controller.render.${namespace}.${entityName}.`
         const rcIdentifier = (await vscode.window.showInputBox({
             placeHolder: 'e.g. controller.render.namespace.my_entity.thing',
             value: initialRenderControllerIdentifier,
@@ -1378,28 +1202,15 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
             return
         }
 
-        const templatePath = nodePath.resolve(context.extensionPath, "template_files/rp_render_controller.json")
-        const templateFile = (await fs.readFile(templatePath)).toString()
-        const template = JSON.parse(templateFile)
+        const template = await readTemplate(context, "rp_render_controller.json")
 
         if (shouldCreateFileFromScratch) {
-            const minEngineVersion = getMinEngineVersion()
-            const formatVersionString = minEngineVersion.join(".")
-
-            const rootTemplatePath = nodePath.resolve(context.extensionPath, "template_files/rp_render_controller_root.json")
-            const rootTemplateFile = (await fs.readFile(rootTemplatePath)).toString()
-            const rootTemplate = JSON.parse(rootTemplateFile)
+            const rootTemplate = await readTemplate(context, "rp_render_controller_root.json")
 
             rootTemplate.render_controllers[rcIdentifier] = template
+            rootTemplate.format_version = defaultFormatVersion
 
-            rootTemplate.format_version = formatVersionString
-
-            const destinationPath = nodePath.resolve(resourcePackDir, "render_controllers", `${entity_name}.render_controller.json`)
-
-            if (existsSync(destinationPath)) {
-                vscode.window.showErrorMessage("File already exists: " + destinationPath);
-                return
-            }
+            const destinationPath = await findOrCreateDestinationPath(resourcePackDir, "render_controllers", "", `${entityName}.render_controller`, ".json")
 
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
@@ -1408,14 +1219,14 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
                 return
             }
             const existingFile = (await fs.readFile(hasExistingFile.path)).toString()
-            const result = jsoncModifyandEditWithInitialisedParents(existingFile,
+            const result = jsoncModify(existingFile,
                 ["render_controllers", rcIdentifier],
                 template,
             )
             fs.writeFile(hasExistingFile.path, result)
         }
 
-        const result = jsoncModifyandEditWithInitialisedParents(entity,
+        const result = jsoncModify(entity,
             ["minecraft:attachable", "description", "render_controllers", -1],
             rcIdentifier,
             true

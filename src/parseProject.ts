@@ -17,9 +17,11 @@ export type NodeInfo = {
 	type: "entity",
 	identifier: string,
 	path: string
-	files: { fileType: FileTypes, path: string }[],
+	files: ProjectFile[],
 	category: Category
 }
+
+export type ProjectFile = { fileType: FileTypes, path: string }
 
 type Category = "entities" | "items"
 export type Root = {
@@ -29,7 +31,7 @@ export type Root = {
 
 // identifier: string
 // TODO: make all values arrays to account for duplicates
-type ProjectData = {
+type ParsedProject = {
 	// RP
 	"rp_entity": Record<string, {
 		path: string
@@ -79,14 +81,7 @@ export const file_type_names: Record<FileTypes, string> = {
 	[FileTypes.rp_attachable]: "rp/attachables",
 }
 
-export function getMinEngineVersion() {
-	// TODO: make read manifest
-	// const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
-
-	return [1, 26, 0]
-}
-
-export function getProjectDirectories() {
+export function getProjectData() {
 	const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 	if (rootPath === undefined) {
 		return
@@ -109,16 +104,20 @@ export function getProjectDirectories() {
 		return
 	}
 
-	return [resourcePackDir, behaviorPackDir]
+	const minEngineVersion = [1,26,0]
+	const defaultFormatVersion = minEngineVersion.join(".")
+
+	return {resourcePackDir, behaviorPackDir, minEngineVersion, defaultFormatVersion}
 }
 
-export function parseProject(): (ProjectData | void) {
-	const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
-	if (resourcePackDir === undefined) {
+export function parseProject(): (ParsedProject | void) {
+	const projectData = getProjectData()
+	if (projectData === undefined) {
 		return
 	}
+	const {resourcePackDir, behaviorPackDir} = projectData
 
-	const rp_entities: ProjectData["rp_entity"] = {}
+	const rp_entities: ParsedProject["rp_entity"] = {}
 	const rp_entity_files = fs.globSync(path.join(resourcePackDir, "./entity/**/*.json"))
 	for (const entity_path of rp_entity_files) {
 		const entity_file = fs.readFileSync(entity_path).toString()
@@ -147,7 +146,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const rp_attachables: ProjectData["rp_attachables"] = {}
+	const rp_attachables: ParsedProject["rp_attachables"] = {}
 	const rp_attachable_files = fs.globSync(path.join(resourcePackDir, "./attachables/**/*.json"))
 	for (const entity_path of rp_attachable_files) {
 		const entity_file = fs.readFileSync(entity_path).toString()
@@ -176,7 +175,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const rp_anims: ProjectData["rp_anims"] = {}
+	const rp_anims: ParsedProject["rp_anims"] = {}
 	const rp_anim_files = fs.globSync(path.join(resourcePackDir, "./animations/**/*.json"))
 	for (const path of rp_anim_files) {
 		const file = fs.readFileSync(path).toString()
@@ -186,7 +185,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const bp_anims: ProjectData["bp_anims"] = {}
+	const bp_anims: ParsedProject["bp_anims"] = {}
 	const bp_anim_files = fs.globSync(path.join(behaviorPackDir, "./animations/**/*.json"))
 	for (const path of bp_anim_files) {
 		const file = fs.readFileSync(path).toString()
@@ -196,7 +195,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const rp_animation_controllers: ProjectData["rp_animation_controllers"] = {}
+	const rp_animation_controllers: ParsedProject["rp_animation_controllers"] = {}
 	const rp_animation_controller_files = fs.globSync(path.join(resourcePackDir, "./animation_controllers/**/*.json"))
 	for (const path of rp_animation_controller_files) {
 		const file = fs.readFileSync(path).toString()
@@ -206,7 +205,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const bp_animation_controllers: ProjectData["bp_animation_controllers"] = {}
+	const bp_animation_controllers: ParsedProject["bp_animation_controllers"] = {}
 	const bp_animation_controller_files = fs.globSync(path.join(behaviorPackDir, "./animation_controllers/**/*.json"))
 	for (const path of bp_animation_controller_files) {
 		const file = fs.readFileSync(path).toString()
@@ -216,7 +215,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const rp_render_controllers: ProjectData["rp_render_controllers"] = {}
+	const rp_render_controllers: ParsedProject["rp_render_controllers"] = {}
 	const rp_rc_files = fs.globSync(path.join(resourcePackDir, "./render_controllers/**/*.json"))
 	for (const path of rp_rc_files) {
 		const file = fs.readFileSync(path).toString()
@@ -226,7 +225,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const bp_entities: ProjectData["bp_entity"] = {}
+	const bp_entities: ParsedProject["bp_entity"] = {}
 	const bp_entity_files = fs.globSync(path.join(behaviorPackDir, "./entities/**/*.json"))
 	for (const entity_path of bp_entity_files) {
 		const entity_file = fs.readFileSync(entity_path).toString()
@@ -239,7 +238,7 @@ export function parseProject(): (ProjectData | void) {
 		}
 	}
 
-	const bp_items: ProjectData["bp_items"] = {}
+	const bp_items: ParsedProject["bp_items"] = {}
 	const bp_item_files = fs.globSync(path.join(behaviorPackDir, "./items/**/*.json"))
 	for (const path of bp_item_files) {
 		const file = fs.readFileSync(path).toString()
@@ -249,7 +248,7 @@ export function parseProject(): (ProjectData | void) {
 		bp_items[identifier] = path
 	}
 
-	const projectData: ProjectData = {
+	const parsedProject: ParsedProject = {
 		rp_entity: rp_entities,
 		rp_anims: rp_anims,
 		bp_anims: bp_anims,
@@ -261,11 +260,11 @@ export function parseProject(): (ProjectData | void) {
 		bp_items: bp_items,
 		rp_attachables: rp_attachables,
 	}
-	return projectData
+	return parsedProject
 	// return parseEntitiesInFolder(path.join(behaviorPackDir, "./entities/"), projectData, true)
 }
 
-export function parseEntitiesInFolder(folderPath: string, projectData: ProjectData, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
+export function parseEntitiesInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
 		type: "folder",
 		children: [],
@@ -278,7 +277,6 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 	const RPPath = path.join(resourcePackDir, "./entity/", folderPath)
 	const BPExists = fs.existsSync(BPPath)
 	const RPExists = fs.existsSync(RPPath)
-
 
 	const subfolders = []
 	if (BPExists) {
@@ -438,7 +436,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ProjectDa
 }
 
 
-export function parseItemsInFolder(folderPath: string, projectData: ProjectData, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
+export function parseItemsInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
 		type: "folder",
 		children: [],

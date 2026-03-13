@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { file_type_names, NodeInfo, Folder, getProjectDirectories, isFolder, Node, parseEntitiesInFolder, parseItemsInFolder, parseProject, Root } from './parseProject';
+import { file_type_names, NodeInfo, Folder, getProjectData, isFolder, Node, parseEntitiesInFolder, parseItemsInFolder, parseProject, Root } from './parseProject';
 import path from 'path';
 import registerAllCommands from './actions';
 
@@ -52,25 +52,33 @@ class EntityJsonTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
 				return this.entityToTreeItems(meta)
 			} else if (meta.type === "root") {
 				if (meta.rootType === "entities") {
-					const projectData = parseProject()
-					if (projectData === void 0) {
+					const parsedProject = parseProject()
+					if (parsedProject === void 0) {
 						vscode.window.showErrorMessage("Unexpected Error")
 						return []
 					}
-					const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
-					const entities = parseEntitiesInFolder("/", projectData, behaviorPackDir, resourcePackDir, true)
+					const projectData = getProjectData()
+					if (projectData === undefined) {
+						return []
+					}
+					const { resourcePackDir, behaviorPackDir } = projectData
+					const entities = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true)
 					if (entities === undefined) {
 						return []
 					}
 					return this.folderChildrenToTreeItems(entities, true)
 				} else if (meta.rootType === "items") {
-					const projectData = parseProject()
-					if (projectData === void 0) {
+					const parsedProject = parseProject()
+					if (parsedProject === void 0) {
 						vscode.window.showErrorMessage("Unexpected Error")
 						return []
 					}
-					const [resourcePackDir, behaviorPackDir] = getProjectDirectories() ?? []
-					const items = parseItemsInFolder("/", projectData, behaviorPackDir, resourcePackDir, true)
+					const projectData = getProjectData()
+					if (projectData === undefined) {
+						return []
+					}
+					const { resourcePackDir, behaviorPackDir } = projectData
+					const items = parseItemsInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true)
 					if (items === undefined) {
 						return []
 					}
