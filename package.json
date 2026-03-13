@@ -3,7 +3,7 @@
   "displayName": "Bedrock Add-On File Grouper",
   "description": "Create add-ons efficiently by cutting out time scrolling through folders.",
   "icon": "images/icon.png",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "engines": {
     "vscode": "^1.107.0"
   },
