@@ -3,7 +3,7 @@
   "displayName": "Lantern for Minecraft Bedrock",
   "description": "A proper IDE experience for Minecraft Bedrock Add-Ons",
   "icon": "images/icon.png",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -14,7 +14,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Hatchibombotar/bedrock-file-grouper"
+    "url": "https://github.com/Hatchibombotar/lantern"
   },
   "activationEvents": [ ],
   "main": "./out/extension.js",
