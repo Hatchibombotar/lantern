@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as JSONC from "jsonc-parser"
-import { FileTypes as FileType, Node, ProjectFile } from "./parseProject";
+import { FileTypes as FileType } from "./analysis/parseProject";
+import { ProjectFile } from './domainViewer/createFolderStructure';
 import nodePath from "path"
 import * as fs from 'fs/promises';
 import { existsSync } from 'fs';
@@ -118,4 +119,13 @@ export async function findOrCreateDestinationPath(packDir: string, folder: strin
         return finalPath
     }
 
+}
+
+export async function createGlobalStorageDirectory(context: vscode.ExtensionContext) {
+    const path = vscode.Uri.file(context.globalStorageUri.fsPath).fsPath
+    if (!existsSync(path)) {
+        await fs.mkdir(path)
+    }
+
+    return path
 }

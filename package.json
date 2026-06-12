@@ -1,9 +1,9 @@
 {
   "name": "bedrock-file-grouper",
-  "displayName": "Bedrock Add-On File Grouper",
-  "description": "Create add-ons efficiently by cutting out time scrolling through folders.",
+  "displayName": "Lantern for Minecraft Bedrock",
+  "description": "A proper IDE experience for Minecraft Bedrock Add-Ons",
   "icon": "images/icon.png",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -19,177 +19,222 @@
   "activationEvents": [ ],
   "main": "./out/extension.js",
   "contributes": {
-    "views": {
-      "explorer": [
+    "colors": [
+      {
+        "id": "bedrockLantern.genericFile",
+        "description": "Color for generic files",
+        "defaults": {
+          "light": "#f7a725",
+          "dark": "#f7a725"
+        }
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
         {
-          "id": "domainCollator",
-          "name": "Grouped Add-On Files"
+          "id": "lantern",
+          "title": "Lantern",
+          "icon": "icons/product/activity_bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "lantern": [
+        {
+          "id": "bedrockLantern",
+          "name": "Grouped Files"
         }
       ]
     },
     "commands": [
       {
-        "command": "domainCollator.createEntity",
-        "title": "Create Entity"
+        "command": "bedrockLantern.createEntity",
+        "title": "Create Entity",
+        "enablement": "view == bedrockLantern"
       },
       {
-        "command": "domainCollator.createItem",
-        "title": "Create Item"
+        "command": "bedrockLantern.importVanillaEntity",
+        "title": "Import Entity from Vanilla",
+        "category": "Lantern"
+      },
+      {
+        "command": "bedrockLantern.createItem",
+        "title": "Create Item",
+        "enablement": "view == bedrockLantern"
+      },
+
+
+      {
+        "command": "bedrockLantern.entityCopyIdentifier",
+        "title": "Copy Entity Identifier",
+        "enablement": "view == bedrockLantern"
+      },
+
+      {
+        "command": "bedrockLantern.entityCreateBPEntity",
+        "title": "Create BP Entity",
+        "enablement": "view == bedrockLantern"
+      },
+      {
+        "command": "bedrockLantern.entityCreateBPAnimation",
+        "title": "Create BP Animation",
+        "enablement": "view == bedrockLantern"
+      },
+      {
+        "command": "bedrockLantern.entityCreateBPAnimationController",
+        "title": "Create BP Animation Controller",
+        "enablement": "view == bedrockLantern"
+      },
+
+      {
+        "command": "bedrockLantern.entityCreateRPEntity",
+        "title": "Create RP Entity",
+        "enablement": "view == bedrockLantern"
+      },
+      {
+        "command": "bedrockLantern.entityCreateRPAnimation",
+        "title": "Create RP Animation",
+        "enablement": "view == bedrockLantern"
+      },
+      {
+        "command": "bedrockLantern.entityCreateRPAnimationController",
+        "title": "Create RP Animation Controller",
+        "enablement": "view == bedrockLantern"
+      },
+      {
+        "command": "bedrockLantern.entityCreateRPRenderController",
+        "title": "Create RP Render Controller",
+        "enablement": "view == bedrockLantern"
       },
 
 
       {
-        "command": "domainCollator.entityCopyIdentifier",
-        "title": "Copy Entity Identifier"
+        "command": "bedrockLantern.itemCopyIdentifier",
+        "title": "Copy Item Identifier",
+        "enablement": "view == bedrockLantern"
       },
 
       {
-        "command": "domainCollator.entityCreateBPEntity",
-        "title": "Create BP Entity"
-      },
-      {
-        "command": "domainCollator.entityCreateBPAnimation",
-        "title": "Create BP Animation"
-      },
-      {
-        "command": "domainCollator.entityCreateBPAnimationController",
-        "title": "Create BP Animation Controller"
+        "command": "bedrockLantern.itemCreateBPItem",
+        "title": "Create BP Item",
+        "enablement": "view == bedrockLantern"
       },
 
       {
-        "command": "domainCollator.entityCreateRPEntity",
-        "title": "Create RP Entity"
+        "command": "bedrockLantern.itemAttachableCreateRPEntity",
+        "title": "Create Attachable",
+        "enablement": "view == bedrockLantern"
       },
       {
-        "command": "domainCollator.entityCreateRPAnimation",
-        "title": "Create RP Animation"
+        "command": "bedrockLantern.itemAttachableCreateRPAnimation",
+        "title": "Create Attachable Animation",
+        "enablement": "view == bedrockLantern"
       },
       {
-        "command": "domainCollator.entityCreateRPAnimationController",
-        "title": "Create RP Animation Controller"
+        "command": "bedrockLantern.itemAttachableCreateRPAnimationController",
+        "title": "Create Attachable Animation Controller",
+        "enablement": "view == bedrockLantern"
       },
       {
-        "command": "domainCollator.entityCreateRPRenderController",
-        "title": "Create RP Render Controller"
-      },
-
-    
-      {
-        "command": "domainCollator.itemCopyIdentifier",
-        "title": "Copy Item Identifier"
-      },
-
-      {
-        "command": "domainCollator.itemCreateBPItem",
-        "title": "Create BP Item"
-      },
-
-      {
-        "command": "domainCollator.itemAttachableCreateRPEntity",
-        "title": "Create Attachable"
-      },
-      {
-        "command": "domainCollator.itemAttachableCreateRPAnimation",
-        "title": "Create Attachable Animation"
-      },
-      {
-        "command": "domainCollator.itemAttachableCreateRPAnimationController",
-        "title": "Create Attachable Animation Controller"
-      },
-      {
-        "command": "domainCollator.itemAttachableCreateRPRenderController",
-        "title": "Create Attachable Render Controller"
+        "command": "bedrockLantern.itemAttachableCreateRPRenderController",
+        "title": "Create Attachable Render Controller",
+        "enablement": "view == bedrockLantern"
       }
     ],
     "menus": {
       "view/item/context": [
         {
-          "command": "domainCollator.createEntity",
-          "when": "view == domainCollator && viewItem == folder_entities",
+          "command": "bedrockLantern.createEntity",
+          "when": "view == bedrockLantern && viewItem == folder_entities",
           "group": "createEntity"
         },
         {
-          "command": "domainCollator.createItem",
-          "when": "view == domainCollator && viewItem == folder_items",
+          "command": "bedrockLantern.importVanillaEntity",
+          "when": "view == bedrockLantern && viewItem == folder_entities",
+          "group": "createEntity"
+        },
+        {
+          "command": "bedrockLantern.createItem",
+          "when": "view == bedrockLantern && viewItem == folder_items",
           "group": "createItem"
         },
 
 
         {
-          "command": "domainCollator.entityCopyIdentifier",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCopyIdentifier",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "aboutEntity"
         },
 
         {
-          "command": "domainCollator.entityCreateBPEntity",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCreateBPEntity",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileBP"
         },
         {
-          "command": "domainCollator.entityCreateBPAnimation",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCreateBPAnimation",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileBP"
         },
         {
-          "command": "domainCollator.entityCreateBPAnimationController",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCreateBPAnimationController",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileBP"
         },
 
         {
-          "command": "domainCollator.entityCreateRPEntity",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCreateRPEntity",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
         {
-          "command": "domainCollator.entityCreateRPAnimation",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCreateRPAnimation",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
         {
-          "command": "domainCollator.entityCreateRPAnimationController",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCreateRPAnimationController",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
         {
-          "command": "domainCollator.entityCreateRPRenderController",
-          "when": "view == domainCollator && viewItem == node_entities",
+          "command": "bedrockLantern.entityCreateRPRenderController",
+          "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
 
 
 
         {
-          "command": "domainCollator.itemCopyIdentifier",
-          "when": "view == domainCollator && viewItem == node_items",
+          "command": "bedrockLantern.itemCopyIdentifier",
+          "when": "view == bedrockLantern && viewItem == node_items",
           "group": "aboutItem"
         },
         {
-          "command": "domainCollator.itemCreateBPItem",
-          "when": "view == domainCollator && viewItem == node_items",
+          "command": "bedrockLantern.itemCreateBPItem",
+          "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileBP"
         },
 
 
         {
-          "command": "domainCollator.itemAttachableCreateRPEntity",
-          "when": "view == domainCollator && viewItem == node_items",
+          "command": "bedrockLantern.itemAttachableCreateRPEntity",
+          "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileRP"
         },
         {
-          "command": "domainCollator.itemAttachableCreateRPAnimation",
-          "when": "view == domainCollator && viewItem == node_items",
+          "command": "bedrockLantern.itemAttachableCreateRPAnimation",
+          "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileRP"
         },
         {
-          "command": "domainCollator.itemAttachableCreateRPAnimationController",
-          "when": "view == domainCollator && viewItem == node_items",
+          "command": "bedrockLantern.itemAttachableCreateRPAnimationController",
+          "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileRP"
         },
         {
-          "command": "domainCollator.itemAttachableCreateRPRenderController",
-          "when": "view == domainCollator && viewItem == node_items",
+          "command": "bedrockLantern.itemAttachableCreateRPRenderController",
+          "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileRP"
         }
       ]
@@ -214,6 +259,7 @@
     "typescript-eslint": "^8.48.1"
   },
   "dependencies": {
-    "jsonc-parser": "^3.3.1"
+    "jsonc-parser": "^3.3.1",
+    "simple-git": "^3.20.0"
   }
 }

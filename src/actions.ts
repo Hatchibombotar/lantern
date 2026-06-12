@@ -3,8 +3,10 @@ import * as fs from 'fs/promises';
 import * as nodePath from 'path';
 import * as JSONC from "jsonc-parser"
 
-import { FileTypes, getProjectData, Node, NodeInfo } from './parseProject';
+import { FileTypes } from './analysis/parseProject';
+import { getProjectData } from './analysis/projectData';
 import { findOrCreateDestinationPath, getFilesOfType, jsoncModifyandEditWithInitialisedParents as jsoncModify, objectModifyWithInitialisedParents, readTemplate } from './utils';
+import { Node, NodeInfo } from './domainViewer/createFolderStructure';
 
 export default function registerAllCommands(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -28,7 +30,7 @@ export default function registerAllCommands(context: vscode.ExtensionContext) {
 }
 
 function createEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.createEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.createEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         let folderPath = ""
@@ -88,7 +90,7 @@ function createEntity(context: vscode.ExtensionContext) {
 }
 
 function createItem(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.createItem", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.createItem", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         let folderPath = ""
@@ -126,7 +128,7 @@ function createItem(context: vscode.ExtensionContext) {
     })
 }
 function entityCopyIdentifier(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.entityCopyIdentifier", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCopyIdentifier", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type === "entity") {
             vscode.env.clipboard.writeText(meta.identifier)
@@ -135,7 +137,7 @@ function entityCopyIdentifier(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateBPEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.entityCreateBPEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCreateBPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
@@ -163,7 +165,7 @@ function entityCreateBPEntity(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateBPAnimation(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.entityCreateBPAnimation", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCreateBPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
@@ -186,7 +188,7 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
             fileDestinationOptions.push(
                 ...existingBPAnimations.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(behaviorPackDir, x.path)
+                    description: nodePath.relative(behaviorPackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -213,7 +215,7 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
             }
         }
 
-        const bpEntity = (await fs.readFile(bpEntityFile.path)).toString()
+        const bpEntity = (await fs.readFile(bpEntityFile.path.exactPath)).toString()
         let parsedBPEntity = JSONC.parse(bpEntity)
 
         const [namespace, entityName] = meta.identifier.trim().split(":")
@@ -273,12 +275,12 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
             if (existingFile === undefined) {
                 return
             }
-            const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
+            const existingAnimationFile = (await fs.readFile(existingFile.path.exactPath)).toString()
             const result = jsoncModify(existingAnimationFile,
                 ["animations", animationIdentifier],
                 template,
             )
-            fs.writeFile(existingFile.path, result)
+            fs.writeFile(existingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(bpEntity,
@@ -286,14 +288,14 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
             animationIdentifier,
         )
 
-        await fs.writeFile(bpEntityFile.path, result)
+        await fs.writeFile(bpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created BP animation.`)
     })
 }
 function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
     // very similar to entityCreateBPAnimation
 
-    return vscode.commands.registerCommand("domainCollator.entityCreateBPAnimationController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCreateBPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
@@ -317,7 +319,7 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
             fileDestinationOptions.push(
                 ...existingBPAnimationControllers.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(behaviorPackDir, x.path)
+                    description: nodePath.relative(behaviorPackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -344,7 +346,7 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
             }
         }
 
-        const bpEntity = (await fs.readFile(bpEntityFile.path)).toString()
+        const bpEntity = (await fs.readFile(bpEntityFile.path.exactPath)).toString()
         let parsedBPEntity = JSONC.parse(bpEntity)
 
         const [namespace, entityName] = meta.identifier.trim().split(":")
@@ -397,19 +399,19 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
             rootTemplate.format_version = defaultFormatVersion
 
             const destinationPath = await findOrCreateDestinationPath(behaviorPackDir, "animation_controllers", "", animationShortName, ".json")
-
+      
             await fs.writeFile(destinationPath, JSON.stringify(rootTemplate, null, 4))
 
         } else {
             if (existingFile === undefined) {
                 return
             }
-            const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
+            const existingAnimationFile = (await fs.readFile(existingFile.path.exactPath)).toString()
             const result = jsoncModify(existingAnimationFile,
                 ["animation_controllers", animationIdentifier],
                 template,
             )
-            fs.writeFile(existingFile.path, result)
+            fs.writeFile(existingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(bpEntity,
@@ -417,12 +419,12 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
             animationIdentifier,
         )
 
-        await fs.writeFile(bpEntityFile.path, result)
+        await fs.writeFile(bpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created BP animation controller.`)
     })
 }
 function entityCreateRPEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.entityCreateRPEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCreateRPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
 
@@ -452,7 +454,7 @@ function entityCreateRPEntity(context: vscode.ExtensionContext) {
     })
 }
 function entityCreateRPAnimation(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.entityCreateRPAnimation", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCreateRPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
@@ -476,7 +478,7 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
             fileDestinationOptions.push(
                 ...existingRPAnimations.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(resourcePackDir, x.path)
+                    description: nodePath.relative(resourcePackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -503,7 +505,7 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
             }
         }
 
-        const entity = (await fs.readFile(rpEntityFile.path)).toString()
+        const entity = (await fs.readFile(rpEntityFile.path.exactPath)).toString()
         let parsedEntity = JSONC.parse(entity)
 
         const [namespace, entityName] = meta.identifier.trim().split(":")
@@ -563,12 +565,12 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
             if (existingFile === undefined) {
                 return
             }
-            const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
+            const existingAnimationFile = (await fs.readFile(existingFile.path.exactPath)).toString()
             const result = jsoncModify(existingAnimationFile,
                 ["animations", animationIdentifier],
                 template,
             )
-            fs.writeFile(existingFile.path, result)
+            fs.writeFile(existingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(entity,
@@ -576,12 +578,12 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
             animationIdentifier,
         )
 
-        await fs.writeFile(rpEntityFile.path, result)
+        await fs.writeFile(rpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created RP animation.`)
     })
 }
 function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.entityCreateRPAnimationController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCreateRPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
@@ -605,7 +607,7 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
             fileDestinationOptions.push(
                 ...existingRPAnimationControllers.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(resourcePackDir, x.path)
+                    description: nodePath.relative(resourcePackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -632,7 +634,7 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
             }
         }
 
-        const entity = (await fs.readFile(rpEntityFile.path)).toString()
+        const entity = (await fs.readFile(rpEntityFile.path.exactPath)).toString()
         let parsedEntity = JSONC.parse(entity)
 
         const [namespace, entityName] = meta.identifier.trim().split(":")
@@ -692,12 +694,12 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
             if (existingFile === undefined) {
                 return
             }
-            const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
+            const existingAnimationFile = (await fs.readFile(existingFile.path.exactPath)).toString()
             const result = jsoncModify(existingAnimationFile,
                 ["animation_controllers", animationIdentifier],
                 template,
             )
-            fs.writeFile(existingFile.path, result)
+            fs.writeFile(existingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(entity,
@@ -705,12 +707,12 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
             animationIdentifier,
         )
 
-        await fs.writeFile(rpEntityFile.path, result)
+        await fs.writeFile(rpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created RP animation controller.`)
     })
 }
 function entityCreateRPRenderController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.entityCreateRPRenderController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.entityCreateRPRenderController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
@@ -734,7 +736,7 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
             fileDestinationOptions.push(
                 ...existingRPRenderControllers.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(resourcePackDir, x.path)
+                    description: nodePath.relative(resourcePackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -761,7 +763,7 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
             }
         }
 
-        const entity = (await fs.readFile(rpEntityFile.path)).toString()
+        const entity = (await fs.readFile(rpEntityFile.path.exactPath)).toString()
         const [namespace, entityName] = meta.identifier.trim().split(":")
 
         const initialRenderControllerIdentifier = `controller.render.${namespace}.${entityName}.`
@@ -792,12 +794,12 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
             if (hasExistingFile === undefined) {
                 return
             }
-            const existingFile = (await fs.readFile(hasExistingFile.path)).toString()
+            const existingFile = (await fs.readFile(hasExistingFile.path.exactPath)).toString()
             const result = jsoncModify(existingFile,
                 ["render_controllers", rcIdentifier],
                 template,
             )
-            fs.writeFile(hasExistingFile.path, result)
+            fs.writeFile(hasExistingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(entity,
@@ -806,12 +808,12 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
             true
         )
 
-        await fs.writeFile(rpEntityFile.path, result)
+        await fs.writeFile(rpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created RP render controller.`)
     })
 }
 function itemCopyIdentifier() {
-    return vscode.commands.registerCommand("domainCollator.itemCopyIdentifier", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.itemCopyIdentifier", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type === "entity") {
             vscode.env.clipboard.writeText(meta.identifier)
@@ -820,7 +822,7 @@ function itemCopyIdentifier() {
     })
 }
 function itemCreateBPItem(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.itemCreateBPItem", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.itemCreateBPItem", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
 
@@ -849,7 +851,7 @@ function itemCreateBPItem(context: vscode.ExtensionContext) {
     })
 }
 function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPEntity", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
 
@@ -879,7 +881,7 @@ function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
     })
 }
 function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPAnimation", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
@@ -903,7 +905,7 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
             fileDestinationOptions.push(
                 ...existingRPAnimations.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(resourcePackDir, x.path)
+                    description: nodePath.relative(resourcePackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -930,7 +932,7 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
             }
         }
 
-        const entity = (await fs.readFile(rpEntityFile.path)).toString()
+        const entity = (await fs.readFile(rpEntityFile.path.exactPath)).toString()
         let parsedEntity = JSONC.parse(entity)
 
         const [namespace, entityName] = meta.identifier.trim().split(":")
@@ -990,12 +992,12 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
             if (existingFile === undefined) {
                 return
             }
-            const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
+            const existingAnimationFile = (await fs.readFile(existingFile.path.exactPath)).toString()
             const result = jsoncModify(existingAnimationFile,
                 ["animations", animationIdentifier],
                 template,
             )
-            fs.writeFile(existingFile.path, result)
+            fs.writeFile(existingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(entity,
@@ -1003,12 +1005,12 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
             animationIdentifier,
         )
 
-        await fs.writeFile(rpEntityFile.path, result)
+        await fs.writeFile(rpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created RP animation.`)
     })
 }
 function itemAttachableCreateRPAnimationController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPAnimationController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
@@ -1032,7 +1034,7 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
             fileDestinationOptions.push(
                 ...existingRPAnimationControllers.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(resourcePackDir, x.path)
+                    description: nodePath.relative(resourcePackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -1059,7 +1061,7 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
             }
         }
 
-        const entity = (await fs.readFile(rpEntityFile.path)).toString()
+        const entity = (await fs.readFile(rpEntityFile.path.exactPath)).toString()
         let parsedEntity = JSONC.parse(entity)
 
         const [namespace, entityName] = meta.identifier.trim().split(":")
@@ -1119,12 +1121,12 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
             if (existingFile === undefined) {
                 return
             }
-            const existingAnimationFile = (await fs.readFile(existingFile.path)).toString()
+            const existingAnimationFile = (await fs.readFile(existingFile.path.exactPath)).toString()
             const result = jsoncModify(existingAnimationFile,
                 ["animation_controllers", animationIdentifier],
                 template,
             )
-            fs.writeFile(existingFile.path, result)
+            fs.writeFile(existingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(entity,
@@ -1132,12 +1134,12 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
             animationIdentifier,
         )
 
-        await fs.writeFile(rpEntityFile.path, result)
+        await fs.writeFile(rpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created RP animation controller.`)
     })
 }
 function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("domainCollator.itemAttachableCreateRPRenderController", async (element: vscode.TreeItem) => {
+    return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPRenderController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
         if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
@@ -1161,7 +1163,7 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
             fileDestinationOptions.push(
                 ...existingRPRenderControllers.map(x => ({
                     label: `Add to existing`,
-                    description: nodePath.relative(resourcePackDir, x.path)
+                    description: nodePath.relative(resourcePackDir, x.path.exactPath)
                 } as vscode.QuickPickItem))
             )
 
@@ -1187,7 +1189,7 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
             }
         }
 
-        const entity = (await fs.readFile(rpEntityFile.path)).toString()
+        const entity = (await fs.readFile(rpEntityFile.path.exactPath)).toString()
 
         const [namespace, entityName] = meta.identifier.trim().split(":")
 
@@ -1218,12 +1220,12 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
             if (hasExistingFile === undefined) {
                 return
             }
-            const existingFile = (await fs.readFile(hasExistingFile.path)).toString()
+            const existingFile = (await fs.readFile(hasExistingFile.path.exactPath)).toString()
             const result = jsoncModify(existingFile,
                 ["render_controllers", rcIdentifier],
                 template,
             )
-            fs.writeFile(hasExistingFile.path, result)
+            fs.writeFile(hasExistingFile.path.exactPath, result)
         }
 
         const result = jsoncModify(entity,
@@ -1232,7 +1234,7 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
             true
         )
 
-        await fs.writeFile(rpEntityFile.path, result)
+        await fs.writeFile(rpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created RP render controller.`)
     })
 }

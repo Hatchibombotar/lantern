@@ -1,38 +1,33 @@
-# Bedrock Add-On File Grouper
-Create add-ons efficiently by cutting out time scrolling through folders.
+# Lantern for Minecraft Bedrock
+A proper IDE experience for Bedrock Add-Ons. Create add-ons efficiently by cutting out time scrolling through folders and manipulating files.
 
+## Features
+### Grouped Files
 This extension adds a new view within the explorer which groups Minecraft Bedrock Add-On Files by identifier.
 
-In the below picture, it shows all files linked to the parrot in the vanilla packs. The group view is in the same panel as the explorer.
+It currently groups files linked to entities and items.
+
+In the below picture, it shows all files linked to the chicken in the vanilla packs. The group view is in the secondary sidebar. 
 
 ![Example](./images/preview.png)
 
-In the below picture, it shows all files linked to the bat in the vanilla packs. The group view is in the secondary sidebar.
+In the below picture, it shows all files linked to the zombie in the vanilla packs. The group view is in the same panel as the explorer.
 
 ![Example](./images/preview-2.png)
 
-## Groups
-The extension groups by the following files:
+### Import from Vanilla Packs
+If you right click on a directory in the entity section of the grouped files panel you can select `Import Entity from Vanilla`. A UI will come up which allows you to rename the identifier and files linked to the entity.
 
-- Entities
-  - BP Entity
-  - BP Animation
-  - BP Animation Controller
-  - RP Entity
-  - RP Animation
-  - RP Animation Controller
-  - RP Render Controller
+You can also run this using the command pallete under the command `Lantern: Import Entity from Vanilla`
 
-- Items
-  - BP Item
-  - RP Attachable
-  - RP Attachable Animation
-  - RP Attachable Animation Controller
-  - RP Attachable Render Controller
+![Example](./images/import.png)
+
+This will download everything that links to the entity e.g. animations, render controllers
+
 
 ## Requirements
 
-As of now you must have a `config.json` file at the root of the project with the following keys:
+You must have a `config.json` file at the root of the project with the following keys:
 
 ```json
 {
@@ -45,7 +40,7 @@ As of now you must have a `config.json` file at the root of the project with the
 
 This conforms to the Bedrock OSS [Project Config Standard](https://github.com/Bedrock-OSS/project-config-standard/).
 
-If you have opened an existing `regolith`/`bridge`/`dash` project then you will already have this within your project.
+If you have opened an existing `regolith`/`dash`/`bridge` project then you will already have this within your project.
 
 <!-- ## Extension Settings -->
 
@@ -53,3 +48,8 @@ If you have opened an existing `regolith`/`bridge`/`dash` project then you will 
 
 - [Release Notes](CHANGELOG.md)
 - [Repository](#)
+
+## Attribution
+- The icons in the sidebar were taken from [SirLich/bedrock-addon-icons](https://github.com/SirLich/bedrock-addon-icons/tree/master) [[LICENSE](https://github.com/SirLich/bedrock-addon-icons/blob/master/LICENSE)]
+
+- This includes icons from Godot. [[LICENSE](https://github.com/godotengine/godot/blob/master/LICENSE.txt)]
