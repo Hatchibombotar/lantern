@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { parseProject, file_type_names, FileTypes } from '../analysis/parseProject';
 import { getProjectData } from '../analysis/projectData';
-import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder } from './createFolderStructure';
+import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, ScriptNode, getScriptsRoot, readScriptDir } from './createFolderStructure';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
 	private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | null>();
@@ -41,6 +41,8 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				return this.folderChildrenToTreeItems(meta);
 			} else if (meta.type === "entity") {
 				return this.entityToTreeItems(meta);
+			} else if (meta.type === "script_dir") {
+				return this.scriptNodesToTreeItems(readScriptDir(meta.path));
 			} else if (meta.type === "root") {
 				if (meta.rootType === "entities") {
 					const projectData = getProjectData();
@@ -105,7 +107,39 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			rootType: "items"
 		} as Root;
 
-		return [entities, items];
+		const roots = [entities, items];
+
+		const projectData = getProjectData();
+		const scriptsRoot = projectData && getScriptsRoot(projectData.scriptsDir);
+		if (scriptsRoot) {
+			roots.push(...this.scriptNodesToTreeItems([scriptsRoot]));
+		}
+
+		return roots;
+	}
+
+	private scriptNodesToTreeItems(nodes: ScriptNode[]): vscode.TreeItem[] {
+		return nodes.map(node => {
+			const uri = vscode.Uri.file(node.path);
+			if (node.type === "script_dir") {
+				const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.Collapsed);
+				item.resourceUri = uri;
+				item.iconPath = vscode.ThemeIcon.Folder;
+				item.contextValue = 'folder_scripts';
+				(item as any).__meta = node;
+				return item;
+			}
+			const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.None);
+			item.resourceUri = uri;
+			item.iconPath = vscode.ThemeIcon.File;
+			item.contextValue = 'node_scripts';
+			item.command = {
+				command: "vscode.open",
+				title: "Open " + node.name,
+				arguments: [uri]
+			};
+			return item;
+		});
 	}
 
 	private entityToTreeItems(entity: NodeInfo): vscode.TreeItem[] {

@@ -6,8 +6,9 @@ import * as vscode from 'vscode';
 export type ProjectData = {
 	resourcePackDir: string,
 	behaviorPackDir: string,
+	scriptsDir: string,
 	minEngineVersion: number[],
-	defaultFormatVersion: string 
+	defaultFormatVersion: string
 }
 
 export function getProjectData(): ProjectData | undefined {
@@ -24,6 +25,10 @@ export function getProjectData(): ProjectData | undefined {
 
 	const behaviorPackDir = path.join(rootPath, config.packs.behaviorPack);
 	const resourcePackDir = path.join(rootPath, config.packs.resourcePack);
+		const scriptsDir = config.packs.scripts
+		? path.join(rootPath, config.packs.scripts)
+		: path.join(behaviorPackDir, "scripts"); // it can be inside BP as well
+
 	if (!fs.existsSync(behaviorPackDir)) {
 		vscode.window.showErrorMessage("Unable to find BP");
 		return;
@@ -32,9 +37,8 @@ export function getProjectData(): ProjectData | undefined {
 		vscode.window.showErrorMessage("Unable to find RP");
 		return;
 	}
-
 	const minEngineVersion = [1, 26, 0];
 	const defaultFormatVersion = minEngineVersion.join(".");
 
-	return { resourcePackDir, behaviorPackDir, minEngineVersion, defaultFormatVersion };
+	return { resourcePackDir, behaviorPackDir, scriptsDir, minEngineVersion, defaultFormatVersion };
 }

@@ -12,7 +12,12 @@ export type Root = {
 	rootType: Category
 }
 
-export type Node = Root | Folder | NodeInfo
+// script should be it own not like entities & items i believe
+export type ScriptNode =
+	| { type: "script_dir", name: string, path: string }
+	| { type: "script_file", name: string, path: string }
+
+export type Node = Root | Folder | NodeInfo | ScriptNode
 
 export type Folder = {
     type: "folder"
@@ -225,6 +230,33 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 
 export function isFolder(x: any): x is Folder {
 	return x && x.type === "folder"
+}
+
+export function getScriptsRoot(scriptsDir: string): ScriptNode | undefined {
+	if (!fs.existsSync(scriptsDir)) {
+		return undefined
+	}
+	return { type: "script_dir", name: "scripts", path: scriptsDir }
+}
+
+// Reads one level of a scripts directory: folders first, then files,
+// each sorted alphabetically. Lazily called per expand by the view.
+export function readScriptDir(dirPath: string): ScriptNode[] {
+	if (!fs.existsSync(dirPath)) {
+		return []
+	}
+	const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+	entries.sort((a, b) => {
+		if (a.isDirectory() !== b.isDirectory()) {
+			return a.isDirectory() ? -1 : 1
+		}
+		return a.name.localeCompare(b.name)
+	})
+	return entries.map(entry => ({
+		type: entry.isDirectory() ? "script_dir" : "script_file",
+		name: entry.name,
+		path: path.join(dirPath, entry.name)
+	}))
 }
 export function getFilesForEntity(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const bp_entity = parsedProject.bp_entity[identifier];

@@ -40,6 +40,22 @@ You must have a `config.json` file at the root of the project with the following
 
 This conforms to the Bedrock OSS [Project Config Standard](https://github.com/Bedrock-OSS/project-config-standard/).
 
+### Scripts location (optional)
+
+The `scripts` group in the Lantern view defaults to `<behaviorPack>/scripts`. If your scripts live elsewhere (e.g. a TypeScript source folder), set `packs.scripts` to a path relative to the project root:
+
+```json
+{
+	"packs": {
+		"behaviorPack": "./packs/BP",
+		"resourcePack": "./packs/RP",
+		"scripts": "./src/scripts"
+	}
+}
+```
+
+The `scripts` group only appears when the resolved folder exists.
+
 If you have opened an existing `regolith`/`dash`/`bridge` project then you will already have this within your project.
 
 <!-- ## Extension Settings -->
