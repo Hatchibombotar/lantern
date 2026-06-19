@@ -3,7 +3,7 @@ import * as fs from 'fs';
 
 export type ProjectFile = { fileType: FileTypes; path: FilePathData; };
 
-import { FileTypes, getDetailedPathInfo, FilePathData, ParsedProject } from "../analysis/parseProject"
+import { FileTypes, getDetailedPathInfo, FilePathData, ParsedProject, ScriptLink } from "../analysis/parseProject"
 
 type Category = "entities" | "items"
 
@@ -12,12 +12,12 @@ export type Root = {
 	rootType: Category
 }
 
-// script should be it own not like entities & items i believe
-export type ScriptNode =
-	| { type: "script_dir", name: string, path: string }
-	| { type: "script_file", name: string, path: string }
+// The "scripts" group is purely link-derived: a flat list of the script files
+// that carry an @lantern annotation. No folder browsing.
+export type ScriptsRoot = { type: "scripts_root" }
+export type ScriptNode = { type: "script_file", name: string, path: string, linkedIdentifiers: string[] }
 
-export type Node = Root | Folder | NodeInfo | ScriptNode
+export type Node = Root | Folder | NodeInfo | ScriptNode | ScriptsRoot
 
 export type Folder = {
     type: "folder"
@@ -31,6 +31,7 @@ export type NodeInfo = {
     identifier: string,
     path: string
     files: ProjectFile[],
+    scriptLinks: ScriptLink[],
     category: Category
 }
 
@@ -113,6 +114,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ParsedPro
 			type: "entity",
 			identifier: identifier,
 			files: files,
+			scriptLinks: getScriptsForIdentifier(projectData, identifier),
 			category: "entities",
 			path: folderPath
 		}
@@ -166,6 +168,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 			files: [
 				{ fileType: FileTypes.bp_items, path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, BPItemFile) },
 			],
+			scriptLinks: getScriptsForIdentifier(projectData, identifier),
 			category: "items",
 			path: folderPath
 		}
@@ -232,31 +235,31 @@ export function isFolder(x: any): x is Folder {
 	return x && x.type === "folder"
 }
 
-export function getScriptsRoot(scriptsDir: string): ScriptNode | undefined {
-	if (!fs.existsSync(scriptsDir)) {
-		return undefined
-	}
-	return { type: "script_dir", name: "scripts", path: scriptsDir }
+// Scripts linked to a given entity/item identifier (for nesting under its group).
+export function getScriptsForIdentifier(parsedProject: ParsedProject, identifier: string): ScriptLink[] {
+	return parsedProject.script_links.filter(link => link.identifier === identifier)
 }
 
-// Reads one level of a scripts directory: folders first, then files,
-// each sorted alphabetically. Lazily called per expand by the view.
-export function readScriptDir(dirPath: string): ScriptNode[] {
-	if (!fs.existsSync(dirPath)) {
-		return []
-	}
-	const entries = fs.readdirSync(dirPath, { withFileTypes: true })
-	entries.sort((a, b) => {
-		if (a.isDirectory() !== b.isDirectory()) {
-			return a.isDirectory() ? -1 : 1
+// The contents of the standalone "scripts" group: one node per script file that
+// has at least one @lantern link, each carrying the identifiers it's linked to.
+export function getLinkedScriptFiles(parsedProject: ParsedProject): ScriptNode[] {
+	const byPath = new Map<string, { name: string, identifiers: Set<string> }>()
+	for (const link of parsedProject.script_links) {
+		let entry = byPath.get(link.scriptPath)
+		if (entry === undefined) {
+			entry = { name: link.relativePath, identifiers: new Set() }
+			byPath.set(link.scriptPath, entry)
 		}
-		return a.name.localeCompare(b.name)
-	})
-	return entries.map(entry => ({
-		type: entry.isDirectory() ? "script_dir" : "script_file",
-		name: entry.name,
-		path: path.join(dirPath, entry.name)
-	}))
+		entry.identifiers.add(link.identifier)
+	}
+	return [...byPath.entries()]
+		.map(([scriptPath, entry]): ScriptNode => ({
+			type: "script_file",
+			name: entry.name,
+			path: scriptPath,
+			linkedIdentifiers: [...entry.identifiers],
+		}))
+		.sort((a, b) => a.name.localeCompare(b.name))
 }
 export function getFilesForEntity(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const bp_entity = parsedProject.bp_entity[identifier];

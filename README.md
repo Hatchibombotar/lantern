@@ -40,23 +40,23 @@ You must have a `config.json` file at the root of the project with the following
 
 This conforms to the Bedrock OSS [Project Config Standard](https://github.com/Bedrock-OSS/project-config-standard/).
 
-### Scripts location (optional)
+If you have opened an existing `regolith`/`dash`/`bridge`/`bedrockcli` project then you will already have this within your project.
 
-The `scripts` group in the Lantern view defaults to `<behaviorPack>/scripts`. If your scripts live elsewhere (e.g. a TypeScript source folder), set `packs.scripts` to a path relative to the project root:
+### Linking scripts to entities/items
 
-```json
-{
-	"packs": {
-		"behaviorPack": "./packs/BP",
-		"resourcePack": "./packs/RP",
-		"scripts": "./src/scripts"
-	}
-}
+Scripts aren't tied to a single identifier, so you link them explicitly with a `@lantern` comment. There's nothing to configure — Lantern scans the workspace (skipping `node_modules`, `out`, `dist`, `build`, `.git`) for these annotations, so your scripts can live anywhere. Linked scripts appear **under** their entity/item group, and a `scripts` group listing the linked files appears once at least one script is linked.
+
+```js
+// whole file -> linked to these identifiers
+// @lantern ["custom:goblin", "custom:ruby"]
+
+// just this block -> jumps to the line when opened from the tree
+// @lantern:region ["custom:goblin"]
+function handleGoblin(e) { ... }
+// @lantern:endregion
 ```
 
-The `scripts` group only appears when the resolved folder exists.
-
-If you have opened an existing `regolith`/`dash`/`bridge` project then you will already have this within your project.
+The fastest way to add one: select code in a `.ts`/`.js` file and right-click → **Link to Entity/Item** (a selection becomes a region link; no selection becomes a whole-file link). A `🔗` CodeLens above each annotation opens the linked entity/item, and unknown identifiers are flagged as warnings.
 
 <!-- ## Extension Settings -->
 
