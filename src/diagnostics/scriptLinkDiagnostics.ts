@@ -47,7 +47,9 @@ function hasConfig(): boolean {
 	return fs.existsSync(path.join(root, "config.json"));
 }
 
-function getKnownIdentifiers(): Set<string> | undefined {
+type KnownIdentifiers = { entities: Set<string>, items: Set<string> };
+
+function getKnownIdentifiers(): KnownIdentifiers | undefined {
 	if (!hasConfig()) {
 		return undefined;
 	}
@@ -59,11 +61,10 @@ function getKnownIdentifiers(): Set<string> | undefined {
 	if (parsedProject === undefined) {
 		return undefined;
 	}
-	return new Set<string>([
-		...Object.keys(parsedProject.bp_entity),
-		...Object.keys(parsedProject.rp_entity),
-		...Object.keys(parsedProject.bp_items),
-	]);
+	return {
+		entities: new Set<string>([...Object.keys(parsedProject.bp_entity), ...Object.keys(parsedProject.rp_entity)]),
+		items: new Set<string>(Object.keys(parsedProject.bp_items)),
+	};
 }
 
 function refresh(document: vscode.TextDocument, collection: vscode.DiagnosticCollection) {
@@ -75,30 +76,21 @@ function refresh(document: vscode.TextDocument, collection: vscode.DiagnosticCol
 
 	const diagnostics: vscode.Diagnostic[] = [];
 	for (const annotation of parseScriptAnnotations(document.getText())) {
-		const line = document.lineAt(annotation.markerLine);
-
-		if (annotation.unterminated) {
-			diagnostics.push(new vscode.Diagnostic(
-				line.range,
-				"Lantern: @lantern:region has no matching @lantern:endregion (treated as extending to end of file).",
-				vscode.DiagnosticSeverity.Warning,
-			));
+		const set = annotation.category === "entities" ? known.entities : known.items;
+		if (set.has(annotation.identifier)) {
+			continue;
 		}
-
-		for (const identifier of annotation.identifiers) {
-			if (known.has(identifier)) {
-				continue;
-			}
-			const index = line.text.indexOf(identifier);
-			const range = index >= 0
-				? new vscode.Range(annotation.markerLine, index, annotation.markerLine, index + identifier.length)
-				: line.range;
-			diagnostics.push(new vscode.Diagnostic(
-				range,
-				`Lantern: unknown entity/item identifier "${identifier}".`,
-				vscode.DiagnosticSeverity.Warning,
-			));
-		}
+		const singular = annotation.category === "entities" ? "entity" : "item";
+		const line = document.lineAt(annotation.line);
+		const index = line.text.indexOf(annotation.identifier);
+		const range = index >= 0
+			? new vscode.Range(annotation.line, index, annotation.line, index + annotation.identifier.length)
+			: line.range;
+		diagnostics.push(new vscode.Diagnostic(
+			range,
+			`Lantern: unknown ${singular} identifier "${annotation.identifier}".`,
+			vscode.DiagnosticSeverity.Warning,
+		));
 	}
 
 	collection.set(document.uri, diagnostics);

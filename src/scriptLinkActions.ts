@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { parseProject, ParsedProject } from './analysis/parseProject';
-import { parseScriptAnnotations } from './analysis/scriptLinks';
 import { getProjectData } from './analysis/projectData';
 
 export default function registerScriptLinkCommands(context: vscode.ExtensionContext) {
@@ -46,28 +45,16 @@ function leadingWhitespace(line: string): string {
 	return line.match(/^\s*/)?.[0] ?? "";
 }
 
-// Right-click a script (in the editor or the Lantern tree) to link it to one or
-// more entities/items. With a non-empty editor selection the link is a
-// `@lantern:region` wrapping the selection; otherwise it's a whole-file
-// `@lantern` annotation at the top of the file.
+// Right-click in a script editor to link the code at the cursor to one or more
+// entities/items. Writes `// @lantern-links-entities [...]` / `-items [...]`
+// comment(s) just above the current line, so opening the link from the tree
+// jumps back to that spot.
 function linkScript() {
-	return vscode.commands.registerCommand("bedrockLantern.linkScript", async (arg: any) => {
-		const meta = arg?.__meta;
-
-		let uri: vscode.Uri;
-		let selection: vscode.Selection | undefined;
-		if (meta && meta.type === "script_file") {
-			uri = vscode.Uri.file(meta.path);
-		} else {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor) {
-				vscode.window.showErrorMessage("Lantern: open a script file to link it.");
-				return;
-			}
-			uri = editor.document.uri;
-			if (!editor.selection.isEmpty) {
-				selection = editor.selection;
-			}
+	return vscode.commands.registerCommand("bedrockLantern.linkScript", async () => {
+		const editor = vscode.window.activeTextEditor;
+		if (editor === undefined) {
+			vscode.window.showErrorMessage("Lantern: open a script file to link it.");
+			return;
 		}
 
 		const parsedProject = getParsedProject();
@@ -83,37 +70,33 @@ function linkScript() {
 
 		const chosen = await vscode.window.showQuickPick(picks, {
 			canPickMany: true,
-			placeHolder: selection ? "Link selection to entities/items" : "Link file to entities/items",
+			placeHolder: "Link this code to entities/items",
 		});
 		if (chosen === undefined || chosen.length === 0) {
 			return;
 		}
-		const identifiers = chosen.map(c => c.label);
 
-		const document = await vscode.workspace.openTextDocument(uri);
-		const edit = new vscode.WorkspaceEdit();
+		const entities = chosen.filter(c => c.description === "entity").map(c => c.label);
+		const items = chosen.filter(c => c.description === "item").map(c => c.label);
 
-		if (selection) {
-			const startLine = selection.start.line;
-			const endLine = selection.end.line;
-			const indent = leadingWhitespace(document.lineAt(startLine).text);
-			edit.insert(uri, new vscode.Position(startLine, 0), `${indent}// @lantern:region ${JSON.stringify(identifiers)}\n`);
-			const endPos = new vscode.Position(endLine, document.lineAt(endLine).text.length);
-			edit.insert(uri, endPos, `\n${indent}// @lantern:endregion`);
-		} else {
-			// Merge into an existing whole-file annotation if there is one.
-			const existing = parseScriptAnnotations(document.getText()).find(a => a.source === "file");
-			if (existing) {
-				const merged = [...new Set([...existing.identifiers, ...identifiers])];
-				edit.replace(uri, document.lineAt(existing.markerLine).range, `// @lantern ${JSON.stringify(merged)}`);
-			} else {
-				edit.insert(uri, new vscode.Position(0, 0), `// @lantern ${JSON.stringify(identifiers)}\n`);
-			}
+		const uri = editor.document.uri;
+		const line = editor.selection.start.line;
+		const indent = leadingWhitespace(editor.document.lineAt(line).text);
+
+		const annotationLines: string[] = [];
+		if (entities.length > 0) {
+			annotationLines.push(`${indent}// @lantern-links-entities ${JSON.stringify(entities)}`);
+		}
+		if (items.length > 0) {
+			annotationLines.push(`${indent}// @lantern-links-items ${JSON.stringify(items)}`);
 		}
 
+		const edit = new vscode.WorkspaceEdit();
+		edit.insert(uri, new vscode.Position(line, 0), annotationLines.join("\n") + "\n");
 		await vscode.workspace.applyEdit(edit);
-		await document.save();
-		vscode.window.showInformationMessage(`Lantern: linked to ${identifiers.join(", ")}.`);
+		await editor.document.save();
+
+		vscode.window.showInformationMessage(`Lantern: linked to ${[...entities, ...items].join(", ")}.`);
 	});
 }
 

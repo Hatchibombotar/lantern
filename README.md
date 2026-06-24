@@ -44,19 +44,31 @@ If you have opened an existing `regolith`/`dash`/`bridge`/`bedrockcli` project t
 
 ### Linking scripts to entities/items
 
-Scripts aren't tied to a single identifier, so you link them explicitly with a `@lantern` comment. There's nothing to configure — Lantern scans the workspace (skipping `node_modules`, `out`, `dist`, `build`, `.git`) for these annotations, so your scripts can live anywhere. Linked scripts appear **under** their entity/item group, and a `scripts` group listing the linked files appears once at least one script is linked.
+Scripts aren't tied to a single identifier, so you link them explicitly with a `@lantern-links-*` comment placed directly above the code it relates to:
 
-```js
-// whole file -> linked to these identifiers
-// @lantern ["custom:goblin", "custom:ruby"]
+```ts
+import { world } from "@minecraft/server"
 
-// just this block -> jumps to the line when opened from the tree
-// @lantern:region ["custom:goblin"]
-function handleGoblin(e) { ... }
-// @lantern:endregion
+// @lantern-links-entities ["custom:goblin"]
+world.afterEvents.entityDie.subscribe((event) => {
+    if (event.deadEntity.typeId === "custom:goblin") {
+        // ...goblin death logic
+    }
+})
+
+// @lantern-links-items ["custom:ruby"]
+world.afterEvents.itemUse.subscribe((event) => {
+    if (event.itemStack.typeId === "custom:ruby") {
+        // ...ruby use logic
+    }
+})
 ```
 
-The fastest way to add one: select code in a `.ts`/`.js` file and right-click → **Link to Entity/Item** (a selection becomes a region link; no selection becomes a whole-file link). A `🔗` CodeLens above each annotation opens the linked entity/item, and unknown identifiers are flagged as warnings.
+This file now shows up as a child of **`custom:goblin`** (under `entities`) and **`custom:ruby`** (under `items`) in the Lantern view. Clicking either entry opens the file scrolled to its annotation — line 3 for the goblin, line 10 for the ruby. List several ids in one comment to link them all: `// @lantern-links-entities ["custom:goblin", "custom:goblin_king"]`.
+
+There's nothing to configure — Lantern scans the workspace (skipping `node_modules`, `out`, `dist`, `build`, `.git`) for these annotations, so your scripts can live anywhere.
+
+The fastest way to add one: put your cursor on the relevant line in a `.ts`/`.js` file and right-click → **Link to Entity/Item**; the comment is inserted just above. A `🔗` CodeLens above each annotation opens the linked entity/item, and identifiers that don't match a known entity/item are flagged as warnings.
 
 <!-- ## Extension Settings -->
 

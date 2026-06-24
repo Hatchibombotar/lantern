@@ -247,12 +247,6 @@
           "command": "bedrockLantern.itemAttachableCreateRPRenderController",
           "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileRP"
-        },
-
-        {
-          "command": "bedrockLantern.linkScript",
-          "when": "view == bedrockLantern && viewItem == node_scripts",
-          "group": "scriptLink"
         }
       ],
       "editor/context": [

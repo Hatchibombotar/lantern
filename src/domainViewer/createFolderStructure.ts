@@ -12,12 +12,7 @@ export type Root = {
 	rootType: Category
 }
 
-// The "scripts" group is purely link-derived: a flat list of the script files
-// that carry an @lantern annotation. No folder browsing.
-export type ScriptsRoot = { type: "scripts_root" }
-export type ScriptNode = { type: "script_file", name: string, path: string, linkedIdentifiers: string[] }
-
-export type Node = Root | Folder | NodeInfo | ScriptNode | ScriptsRoot
+export type Node = Root | Folder | NodeInfo
 
 export type Folder = {
     type: "folder"
@@ -114,7 +109,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ParsedPro
 			type: "entity",
 			identifier: identifier,
 			files: files,
-			scriptLinks: getScriptsForIdentifier(projectData, identifier),
+			scriptLinks: getScriptsForIdentifier(projectData, identifier, "entities"),
 			category: "entities",
 			path: folderPath
 		}
@@ -168,7 +163,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 			files: [
 				{ fileType: FileTypes.bp_items, path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, BPItemFile) },
 			],
-			scriptLinks: getScriptsForIdentifier(projectData, identifier),
+			scriptLinks: getScriptsForIdentifier(projectData, identifier, "items"),
 			category: "items",
 			path: folderPath
 		}
@@ -235,31 +230,19 @@ export function isFolder(x: any): x is Folder {
 	return x && x.type === "folder"
 }
 
-// Scripts linked to a given entity/item identifier (for nesting under its group).
-export function getScriptsForIdentifier(parsedProject: ParsedProject, identifier: string): ScriptLink[] {
-	return parsedProject.script_links.filter(link => link.identifier === identifier)
-}
-
-// The contents of the standalone "scripts" group: one node per script file that
-// has at least one @lantern link, each carrying the identifiers it's linked to.
-export function getLinkedScriptFiles(parsedProject: ParsedProject): ScriptNode[] {
-	const byPath = new Map<string, { name: string, identifiers: Set<string> }>()
+// Scripts linked to a given entity/item identifier, for nesting under its group.
+// Deduped per file (first annotation wins, so the tree jumps to its line).
+export function getScriptsForIdentifier(parsedProject: ParsedProject, identifier: string, category: Category): ScriptLink[] {
+	const seen = new Set<string>()
+	const links: ScriptLink[] = []
 	for (const link of parsedProject.script_links) {
-		let entry = byPath.get(link.scriptPath)
-		if (entry === undefined) {
-			entry = { name: link.relativePath, identifiers: new Set() }
-			byPath.set(link.scriptPath, entry)
+		if (link.identifier !== identifier || link.category !== category || seen.has(link.scriptPath)) {
+			continue
 		}
-		entry.identifiers.add(link.identifier)
+		seen.add(link.scriptPath)
+		links.push(link)
 	}
-	return [...byPath.entries()]
-		.map(([scriptPath, entry]): ScriptNode => ({
-			type: "script_file",
-			name: entry.name,
-			path: scriptPath,
-			linkedIdentifiers: [...entry.identifiers],
-		}))
-		.sort((a, b) => a.name.localeCompare(b.name))
+	return links
 }
 export function getFilesForEntity(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const bp_entity = parsedProject.bp_entity[identifier];

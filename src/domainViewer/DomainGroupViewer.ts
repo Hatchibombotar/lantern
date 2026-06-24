@@ -1,22 +1,16 @@
 import * as vscode from 'vscode';
 import { parseProject, file_type_names, FileTypes, ScriptLink } from '../analysis/parseProject';
 import { getProjectData } from '../analysis/projectData';
-import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, ScriptNode, ScriptsRoot, getLinkedScriptFiles } from './createFolderStructure';
+import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder } from './createFolderStructure';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
 	private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | null>();
 	readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
 	context: vscode.ExtensionContext;
-	private treeView?: vscode.TreeView<vscode.TreeItem>;
 
 	constructor(context: vscode.ExtensionContext, private workspaceRoot?: string) {
 		this.context = context;
-	}
-
-	// Lets us show an onboarding hint via the view's message area.
-	setTreeView(treeView: vscode.TreeView<vscode.TreeItem>) {
-		this.treeView = treeView;
 	}
 
 	refresh(node?: vscode.TreeItem) {
@@ -47,12 +41,6 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				return this.folderChildrenToTreeItems(meta);
 			} else if (meta.type === "entity") {
 				return this.entityToTreeItems(meta);
-			} else if (meta.type === "scripts_root") {
-				const parsedProject = parseProject(projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot);
-				if (parsedProject === undefined) {
-					return [];
-				}
-				return this.scriptNodesToTreeItems(getLinkedScriptFiles(parsedProject));
 			} else if (meta.type === "root") {
 				if (meta.rootType === "entities") {
 					const projectData = getProjectData();
@@ -117,55 +105,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			rootType: "items"
 		} as Root;
 
-		const roots = [entities, items];
-
-		// The scripts group only appears once at least one script is linked via a
-		// `@lantern` annotation. Until then we surface a hint instead of the group.
-		const projectData = getProjectData();
-		let hasLinks = false;
-		if (projectData !== undefined) {
-			const parsedProject = parseProject(projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot);
-			hasLinks = parsedProject !== undefined && parsedProject.script_links.length > 0;
-			if (hasLinks) {
-				const scripts = new vscode.TreeItem(`scripts`, vscode.TreeItemCollapsibleState.Collapsed);
-				scripts.contextValue = 'folder_scripts';
-				(scripts as any).__meta = { type: "scripts_root" } as ScriptsRoot;
-				roots.push(scripts);
-			}
-		}
-		this.updateScriptsHint(hasLinks);
-
-		return roots;
-	}
-
-	private updateScriptsHint(hasLinks: boolean) {
-		if (this.treeView === undefined) {
-			return;
-		}
-		this.treeView.message = hasLinks
-			? undefined
-			: "Tip: link a script to an entity/item — select code in a .ts/.js file and right-click → “Link to Entity/Item”.";
-	}
-
-	private scriptNodesToTreeItems(nodes: ScriptNode[]): vscode.TreeItem[] {
-		return nodes.map(node => {
-			const uri = vscode.Uri.file(node.path);
-			const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.None);
-			item.resourceUri = uri;
-			item.iconPath = vscode.ThemeIcon.File;
-			item.contextValue = 'node_scripts';
-			(item as any).__meta = node;
-			if (node.linkedIdentifiers.length > 0) {
-				item.description = "used by: " + node.linkedIdentifiers.join(", ");
-				item.tooltip = "Linked to " + node.linkedIdentifiers.join(", ");
-			}
-			item.command = {
-				command: "vscode.open",
-				title: "Open " + node.name,
-				arguments: [uri]
-			};
-			return item;
-		});
+		return [entities, items];
 	}
 
 	private entityToTreeItems(entity: NodeInfo): vscode.TreeItem[] {
@@ -217,19 +157,14 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 	private scriptLinkToTreeItem(link: ScriptLink): vscode.TreeItem {
 		const item = new vscode.TreeItem("script", vscode.TreeItemCollapsibleState.None);
-		const isRegion = link.source === "region" && link.range !== undefined;
 
-		item.description = isRegion ? `${link.relativePath}:${link.range!.startLine + 1}` : link.relativePath;
-		item.tooltip = isRegion
-			? `${link.scriptPath} (region @ line ${link.range!.startLine + 1})`
-			: link.scriptPath;
+		item.description = `${link.relativePath}:${link.line + 1}`;
+		item.tooltip = `${link.scriptPath}:${link.line + 1}`;
 
+		// Open the script scrolled to the line the annotation sits on.
 		const uri = vscode.Uri.file(link.scriptPath);
-		const openArgs: any[] = [uri];
-		if (isRegion) {
-			openArgs.push({ selection: new vscode.Range(link.range!.startLine, 0, link.range!.endLine, 0) });
-		}
-		item.command = { command: "vscode.open", title: "Open script", arguments: openArgs };
+		const selection = new vscode.Range(link.line, 0, link.line, 0);
+		item.command = { command: "vscode.open", title: "Open script", arguments: [uri, { selection }] };
 
 		const icon = "bp/file.svg";
 		item.iconPath = {

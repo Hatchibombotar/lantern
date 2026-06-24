@@ -3,18 +3,14 @@ import * as fs from 'fs';
 
 import * as JSONC from "jsonc-parser"
 import { SymbolValue } from './symbols';
-import { parseScriptAnnotations } from './scriptLinks';
+import { parseScriptAnnotations, ScriptAnnotation } from './scriptLinks';
 
-// A resolved link between a script file and an entity/item identifier, declared
-// via a `// @lantern [...]` (whole-file) or `// @lantern:region [...]` (span)
-// annotation. Lives outside RP/BP so it carries a plain absolute path rather
-// than FilePathData. Line numbers are 0-based.
-export type ScriptLink = {
+// A `@lantern-links-*` annotation resolved to the file it was found in. Lives
+// anywhere in the workspace, so it carries a plain absolute path rather than
+// FilePathData. `relativePath` is workspace-relative, for display.
+export type ScriptLink = ScriptAnnotation & {
 	scriptPath: string,
-	relativePath: string,            // path relative to scriptsDir, for display
-	identifier: string,
-	source: "file" | "region",
-	range?: { startLine: number, endLine: number },
+	relativePath: string,
 }
 
 export type FilePathData = {
@@ -293,13 +289,10 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 
 	const script_links: ScriptLink[] = []
 	if (scanRoot && fs.existsSync(scanRoot)) {
-		// Identifiers we can legitimately link to. Matching annotations against
-		// this set lets us ignore typos / renamed ids (surfaced as diagnostics).
-		const knownIdentifiers = new Set<string>([
-			...Object.keys(rp_entities),
-			...Object.keys(bp_entities),
-			...Object.keys(bp_items),
-		])
+		// Identifiers we can legitimately link to, by category. Matching against
+		// these lets us drop typos / renamed ids (surfaced as diagnostics).
+		const knownEntities = new Set<string>([...Object.keys(rp_entities), ...Object.keys(bp_entities)])
+		const knownItems = new Set<string>(Object.keys(bp_items))
 
 		for (const scriptFile of findScriptFiles(scanRoot)) {
 			const content = fs.readFileSync(scriptFile).toString()
@@ -309,18 +302,11 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 			}
 			const relativePath = path.relative(scanRoot, scriptFile)
 			for (const annotation of annotations) {
-				for (const identifier of annotation.identifiers) {
-					if (!knownIdentifiers.has(identifier)) {
-						continue
-					}
-					script_links.push({
-						scriptPath: scriptFile,
-						relativePath,
-						identifier,
-						source: annotation.source,
-						range: annotation.range,
-					})
+				const known = annotation.category === "entities" ? knownEntities : knownItems
+				if (!known.has(annotation.identifier)) {
+					continue
 				}
+				script_links.push({ ...annotation, scriptPath: scriptFile, relativePath })
 			}
 		}
 	}

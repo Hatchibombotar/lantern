@@ -12,11 +12,11 @@ export function activate(context: vscode.ExtensionContext) {
 		context,
 		root,
 	)
-	const treeView = vscode.window.createTreeView('bedrockLantern', {
-		treeDataProvider: domainGroupViewer
-	})
-	domainGroupViewer.setTreeView(treeView)
-	context.subscriptions.push(treeView)
+	context.subscriptions.push(
+		vscode.window.createTreeView('bedrockLantern', {
+			treeDataProvider: domainGroupViewer
+		})
+	)
 
 	// Debounce: the watcher fires per file on bulk operations (builds, git ops),
 	// and a refresh re-runs the full project parse, so batch them.
