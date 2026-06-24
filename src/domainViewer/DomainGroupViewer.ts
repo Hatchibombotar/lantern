@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { parseProject, file_type_names, FileTypes, ScriptLink } from '../analysis/parseProject';
 import { getProjectData } from '../analysis/projectData';
 import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder } from './createFolderStructure';
+import path from 'path';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
 	private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | null>();
@@ -156,7 +157,9 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 	}
 
 	private scriptLinkToTreeItem(link: ScriptLink): vscode.TreeItem {
-		const item = new vscode.TreeItem("script", vscode.TreeItemCollapsibleState.None);
+		const fileName = path.basename(link.scriptPath)
+
+		const item = new vscode.TreeItem(fileName, vscode.TreeItemCollapsibleState.None);
 
 		item.description = `${link.relativePath}:${link.line + 1}`;
 		item.tooltip = `${link.scriptPath}:${link.line + 1}`;
@@ -166,13 +169,8 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		const selection = new vscode.Range(link.line, 0, link.line, 0);
 		item.command = { command: "vscode.open", title: "Open script", arguments: [uri, { selection }] };
 
-		const icon = "bp/file.svg";
-		item.iconPath = {
-			dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
-			light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
-			color: new vscode.ThemeColor("testing.iconPassed")
-		};
 		item.contextValue = 'node_entity_script';
+		item.resourceUri = uri
 		return item;
 	}
 
@@ -201,6 +199,9 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 				item.contextValue = 'node_' + child.category;
 				item.tooltip = child.identifier;
+
+				// item.id = `${child.category}-${child.identifier}`;
+
 				(item as any).__meta = child;
 				return item;
 			}
