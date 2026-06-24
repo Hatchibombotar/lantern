@@ -139,6 +139,17 @@
         "command": "bedrockLantern.itemAttachableCreateRPRenderController",
         "title": "Create Attachable Render Controller",
         "enablement": "view == bedrockLantern"
+      },
+
+      {
+        "command": "bedrockLantern.linkScript",
+        "title": "Link to Entity/Item",
+        "category": "Lantern"
+      },
+      {
+        "command": "bedrockLantern.openLinkedIdentifier",
+        "title": "Open Linked Entity/Item",
+        "category": "Lantern"
       }
     ],
     "menus": {
@@ -236,6 +247,23 @@
           "command": "bedrockLantern.itemAttachableCreateRPRenderController",
           "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileRP"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "bedrockLantern.linkScript",
+          "when": "resourceExtname =~ /\\.(ts|js)$/",
+          "group": "bedrockLantern"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "bedrockLantern.openLinkedIdentifier",
+          "when": "false"
+        },
+        {
+          "command": "bedrockLantern.linkScript",
+          "when": "editorLangId == typescript || editorLangId == javascript"
         }
       ]
     }

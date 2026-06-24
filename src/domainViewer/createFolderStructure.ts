@@ -3,7 +3,7 @@ import * as fs from 'fs';
 
 export type ProjectFile = { fileType: FileTypes; path: FilePathData; };
 
-import { FileTypes, getDetailedPathInfo, FilePathData, ParsedProject } from "../analysis/parseProject"
+import { FileTypes, getDetailedPathInfo, FilePathData, ParsedProject, ScriptLink } from "../analysis/parseProject"
 
 type Category = "entities" | "items"
 
@@ -26,6 +26,7 @@ export type NodeInfo = {
     identifier: string,
     path: string
     files: ProjectFile[],
+    scriptLinks: ScriptLink[],
     category: Category
 }
 
@@ -108,6 +109,7 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ParsedPro
 			type: "entity",
 			identifier: identifier,
 			files: files,
+			scriptLinks: getScriptsForIdentifier(projectData, identifier, "entities"),
 			category: "entities",
 			path: folderPath
 		}
@@ -161,6 +163,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 			files: [
 				{ fileType: FileTypes.bp_items, path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, BPItemFile) },
 			],
+			scriptLinks: getScriptsForIdentifier(projectData, identifier, "items"),
 			category: "items",
 			path: folderPath
 		}
@@ -225,6 +228,21 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 
 export function isFolder(x: any): x is Folder {
 	return x && x.type === "folder"
+}
+
+// Scripts linked to a given entity/item identifier, for nesting under its group.
+// Deduped per file (first annotation wins, so the tree jumps to its line).
+export function getScriptsForIdentifier(parsedProject: ParsedProject, identifier: string, category: Category): ScriptLink[] {
+	const seen = new Set<string>()
+	const links: ScriptLink[] = []
+	for (const link of parsedProject.script_links) {
+		if (link.identifier !== identifier || link.category !== category || seen.has(link.scriptPath)) {
+			continue
+		}
+		seen.add(link.scriptPath)
+		links.push(link)
+	}
+	return links
 }
 export function getFilesForEntity(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const bp_entity = parsedProject.bp_entity[identifier];

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { parseProject, file_type_names, FileTypes } from '../analysis/parseProject';
+import { parseProject, file_type_names, FileTypes, ScriptLink } from '../analysis/parseProject';
 import { getProjectData } from '../analysis/projectData';
 import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder } from './createFolderStructure';
 
@@ -47,9 +47,9 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 					if (projectData === undefined) {
 						return [];
 					}
-					const { resourcePackDir, behaviorPackDir } = projectData;
+					const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
 
-					const parsedProject = parseProject(resourcePackDir, behaviorPackDir);
+					const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
 					if (parsedProject === void 0) {
 						vscode.window.showErrorMessage("Unexpected Error");
 						return [];
@@ -64,9 +64,9 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 					if (projectData === undefined) {
 						return [];
 					}
-					const { resourcePackDir, behaviorPackDir } = projectData;
+					const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
 
-					const parsedProject = parseProject(resourcePackDir, behaviorPackDir);
+					const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
 					if (parsedProject === void 0) {
 						vscode.window.showErrorMessage("Unexpected Error");
 						return [];
@@ -109,7 +109,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 	}
 
 	private entityToTreeItems(entity: NodeInfo): vscode.TreeItem[] {
-		return entity.files.map(file => {
+		const fileItems = entity.files.map(file => {
 			const fileTypeName = file_type_names[file.fileType];
 			if (!file.path) {
 				console.error("missing file path" + file.fileType + JSON.stringify(entity));
@@ -149,6 +149,31 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 			return item;
 		}).filter(x => x !== null);
+
+		const scriptItems = entity.scriptLinks.map(link => this.scriptLinkToTreeItem(link));
+
+		return [...fileItems, ...scriptItems];
+	}
+
+	private scriptLinkToTreeItem(link: ScriptLink): vscode.TreeItem {
+		const item = new vscode.TreeItem("script", vscode.TreeItemCollapsibleState.None);
+
+		item.description = `${link.relativePath}:${link.line + 1}`;
+		item.tooltip = `${link.scriptPath}:${link.line + 1}`;
+
+		// Open the script scrolled to the line the annotation sits on.
+		const uri = vscode.Uri.file(link.scriptPath);
+		const selection = new vscode.Range(link.line, 0, link.line, 0);
+		item.command = { command: "vscode.open", title: "Open script", arguments: [uri, { selection }] };
+
+		const icon = "bp/file.svg";
+		item.iconPath = {
+			dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
+			light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
+			color: new vscode.ThemeColor("testing.iconPassed")
+		};
+		item.contextValue = 'node_entity_script';
+		return item;
 	}
 
 	private folderChildrenToTreeItems(folder: Folder, isRoot = false): vscode.TreeItem[] {

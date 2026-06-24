@@ -3,6 +3,15 @@ import * as fs from 'fs';
 
 import * as JSONC from "jsonc-parser"
 import { SymbolValue } from './symbols';
+import { parseScriptAnnotations, ScriptAnnotation } from './scriptLinks';
+
+// A `@lantern-links-*` annotation resolved to the file it was found in. Lives
+// anywhere in the workspace, so it carries a plain absolute path rather than
+// FilePathData. `relativePath` is workspace-relative, for display.
+export type ScriptLink = ScriptAnnotation & {
+	scriptPath: string,
+	relativePath: string,
+}
 
 export type FilePathData = {
 	relativePath: string, // the path relative to the RP/BP directory. e.g. entity\awesome.entity.json
@@ -57,6 +66,8 @@ export type ParsedProject = {
 
 
 	"bp_items": Record<SymbolValue, FilePathData>,
+
+	"script_links": ScriptLink[],
 }
 
 export enum FileTypes {
@@ -105,7 +116,37 @@ export function getDetailedPathInfo(resourcePackDir: string, behaviorPackDir: st
 
 }
 
-export function parseProject(resourcePackDir: string, behaviorPackDir: string): (ParsedProject | void) {
+// Directories never worth scanning for @lantern annotations.
+const EXCLUDED_SCAN_DIRS = new Set(["node_modules", "out", "dist", "build", ".git"])
+
+// Recursively collect .ts/.js files under root, pruning excluded directories so
+// we never descend into node_modules etc. (much cheaper than glob + filter).
+function findScriptFiles(root: string): string[] {
+	const found: string[] = []
+	const stack = [root]
+	while (stack.length > 0) {
+		const dir = stack.pop()!
+		let entries: import('fs').Dirent[]
+		try {
+			entries = fs.readdirSync(dir, { withFileTypes: true })
+		} catch {
+			continue
+		}
+		for (const entry of entries) {
+			const fullPath = path.join(dir, entry.name)
+			if (entry.isDirectory()) {
+				if (!EXCLUDED_SCAN_DIRS.has(entry.name)) {
+					stack.push(fullPath)
+				}
+			} else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".js"))) {
+				found.push(fullPath)
+			}
+		}
+	}
+	return found
+}
+
+export function parseProject(resourcePackDir: string, behaviorPackDir: string, scanRoot?: string): (ParsedProject | void) {
 	const rp_entities: ParsedProject["rp_entity"] = {}
 	const rp_entity_files = fs.globSync(path.join(resourcePackDir, "./entity/**/*.json"))
 	for (const entity_path of rp_entity_files) {
@@ -246,6 +287,30 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string): 
 		bp_items[identifier] = getDetailedPathInfo(resourcePackDir, behaviorPackDir, path)
 	}
 
+	const script_links: ScriptLink[] = []
+	if (scanRoot && fs.existsSync(scanRoot)) {
+		// Identifiers we can legitimately link to, by category. Matching against
+		// these lets us drop typos / renamed ids (surfaced as diagnostics).
+		const knownEntities = new Set<string>([...Object.keys(rp_entities), ...Object.keys(bp_entities)])
+		const knownItems = new Set<string>(Object.keys(bp_items))
+
+		for (const scriptFile of findScriptFiles(scanRoot)) {
+			const content = fs.readFileSync(scriptFile).toString()
+			const annotations = parseScriptAnnotations(content)
+			if (annotations.length === 0) {
+				continue
+			}
+			const relativePath = path.relative(scanRoot, scriptFile)
+			for (const annotation of annotations) {
+				const known = annotation.category === "entities" ? knownEntities : knownItems
+				if (!known.has(annotation.identifier)) {
+					continue
+				}
+				script_links.push({ ...annotation, scriptPath: scriptFile, relativePath })
+			}
+		}
+	}
+
 	const parsedProject: ParsedProject = {
 		resourcePackDir: resourcePackDir,
 		behaviorPackDir: behaviorPackDir,
@@ -260,6 +325,8 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string): 
 
 		bp_items: bp_items,
 		rp_attachables: rp_attachables,
+
+		script_links,
 	}
 	return parsedProject
 }

@@ -6,8 +6,9 @@ import * as vscode from 'vscode';
 export type ProjectData = {
 	resourcePackDir: string,
 	behaviorPackDir: string,
+	workspaceRoot: string,   // scanned for @lantern script annotations
 	minEngineVersion: number[],
-	defaultFormatVersion: string 
+	defaultFormatVersion: string
 }
 
 export function getProjectData(): ProjectData | undefined {
@@ -24,6 +25,7 @@ export function getProjectData(): ProjectData | undefined {
 
 	const behaviorPackDir = path.join(rootPath, config.packs.behaviorPack);
 	const resourcePackDir = path.join(rootPath, config.packs.resourcePack);
+
 	if (!fs.existsSync(behaviorPackDir)) {
 		vscode.window.showErrorMessage("Unable to find BP");
 		return;
@@ -33,8 +35,12 @@ export function getProjectData(): ProjectData | undefined {
 		return;
 	}
 
+	// @lantern script annotations are discovered by scanning the workspace, so no
+	// scripts path needs configuring.
+	const workspaceRoot = rootPath;
+
 	const minEngineVersion = [1, 26, 0];
 	const defaultFormatVersion = minEngineVersion.join(".");
 
-	return { resourcePackDir, behaviorPackDir, minEngineVersion, defaultFormatVersion };
+	return { resourcePackDir, behaviorPackDir, workspaceRoot, minEngineVersion, defaultFormatVersion };
 }

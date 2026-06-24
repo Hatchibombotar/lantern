@@ -40,7 +40,35 @@ You must have a `config.json` file at the root of the project with the following
 
 This conforms to the Bedrock OSS [Project Config Standard](https://github.com/Bedrock-OSS/project-config-standard/).
 
-If you have opened an existing `regolith`/`dash`/`bridge` project then you will already have this within your project.
+If you have opened an existing `regolith`/`dash`/`bridge`/`bedrockcli` project then you will already have this within your project.
+
+### Linking scripts to entities/items
+
+Scripts aren't tied to a single identifier, so you link them explicitly with a `@lantern-links-*` comment placed directly above the code it relates to:
+
+```ts
+import { world } from "@minecraft/server"
+
+// @lantern-links-entities ["custom:goblin"]
+world.afterEvents.entityDie.subscribe((event) => {
+    if (event.deadEntity.typeId === "custom:goblin") {
+        // ...goblin death logic
+    }
+})
+
+// @lantern-links-items ["custom:ruby"]
+world.afterEvents.itemUse.subscribe((event) => {
+    if (event.itemStack.typeId === "custom:ruby") {
+        // ...ruby use logic
+    }
+})
+```
+
+This file now shows up as a child of **`custom:goblin`** (under `entities`) and **`custom:ruby`** (under `items`) in the Lantern view. Clicking either entry opens the file scrolled to its annotation — line 3 for the goblin, line 10 for the ruby. List several ids in one comment to link them all: `// @lantern-links-entities ["custom:goblin", "custom:goblin_king"]`.
+
+There's nothing to configure — Lantern scans the workspace (skipping `node_modules`, `out`, `dist`, `build`, `.git`) for these annotations, so your scripts can live anywhere.
+
+The fastest way to add one: put your cursor on the relevant line in a `.ts`/`.js` file and right-click → **Link to Entity/Item**; the comment is inserted just above. A `🔗` CodeLens above each annotation opens the linked entity/item, and identifiers that don't match a known entity/item are flagged as warnings.
 
 <!-- ## Extension Settings -->
 
