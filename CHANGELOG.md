@@ -4,9 +4,10 @@ All notable changes to the extension will be documented in this file.
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 
-## [0.4.0]
-- Added script linking to the lantern sidebar, [thanks to Keyyard](https://github.com/Hatchibombotar/lantern/pull/1).
+## [0.4.0], [0.4.1]
+- Added script linking to the lantern sidebar, [with contributions from Keyyard](https://github.com/Hatchibombotar/lantern/pull/1).
   - Uses annotations `@lantern-links-entities`, and `@lantern-links-items`
+  - It also shows a codelens hint above the annotation in the file which brings you to the selected item/entity in the sidebar.
 
 ## [0.3.0]
 - Renamed extension to "Lantern for Minecraft Bedrock"
