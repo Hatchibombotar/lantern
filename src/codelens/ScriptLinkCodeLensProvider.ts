@@ -12,7 +12,7 @@ export class ScriptLinkCodeLensProvider implements vscode.CodeLensProvider {
 				title: `🔗 ${annotation.identifier}`,
 				tooltip: `Open ${annotation.identifier} in Lantern`,
 				command: "bedrockLantern.openLinkedIdentifier",
-				arguments: [annotation.identifier]
+				arguments: [annotation.identifier, annotation.category]
 			}
 		));
 	}

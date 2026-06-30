@@ -1,13 +1,13 @@
 import * as JSONC from "jsonc-parser"
+import { Category } from "../domainViewer/createFolderStructure"
 
-export type ScriptCategory = "entities" | "items"
 
 // One identifier a script links to, via a `// @lantern-links-entities [...]` or
 // `// @lantern-links-items [...]` comment. `line` is the 0-based line the
 // annotation sits on, so the tree can jump to it. One annotation comment listing
 // N identifiers produces N of these.
 export type ScriptAnnotation = {
-	category: ScriptCategory,
+	category: Category,
 	identifier: string,
 	line: number,
 }
@@ -36,7 +36,7 @@ export function parseScriptAnnotations(content: string): ScriptAnnotation[] {
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i]
 
-		const collect = (regex: RegExp, category: ScriptCategory) => {
+		const collect = (regex: RegExp, category: Category) => {
 			const match = regex.exec(line)
 			if (match === null) {
 				return

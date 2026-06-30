@@ -5,7 +5,7 @@ export type ProjectFile = { fileType: FileTypes; path: FilePathData; };
 
 import { FileTypes, getDetailedPathInfo, FilePathData, ParsedProject, ScriptLink } from "../analysis/parseProject"
 
-type Category = "entities" | "items"
+export type Category = "entities" | "items"
 
 export type Root = {
 	type: "root",

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { parseProject, file_type_names, FileTypes, ScriptLink } from '../analysis/parseProject';
 import { getProjectData } from '../analysis/projectData';
-import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder } from './createFolderStructure';
+import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category } from './createFolderStructure';
 import path from 'path';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -22,7 +22,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		return element;
 	}
 
-	getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
+	getChildren(parent?: vscode.TreeItem): vscode.TreeItem[] {
 		if (!this.workspaceRoot) {
 			return [];
 		}
@@ -33,15 +33,15 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			return [];
 		}
 
-		if (element) {
-			const meta = (element as any).__meta as (Node) | undefined;
+		if (parent) {
+			const meta = (parent as any).__meta as (Node) | undefined;
 			// console.log(meta)
 			if (meta === undefined) {
 				return [];
 			} else if (isFolder(meta)) {
-				return this.folderChildrenToTreeItems(meta);
+				return this.folderChildrenToTreeItems(parent, meta);
 			} else if (meta.type === "entity") {
-				return this.entityToTreeItems(meta);
+				return this.entityToTreeItems(parent, meta);
 			} else if (meta.type === "root") {
 				if (meta.rootType === "entities") {
 					const projectData = getProjectData();
@@ -59,7 +59,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 					if (entities === undefined) {
 						return [];
 					}
-					return this.folderChildrenToTreeItems(entities, true);
+					return this.folderChildrenToTreeItems(parent, entities, true);
 				} else if (meta.rootType === "items") {
 					const projectData = getProjectData();
 					if (projectData === undefined) {
@@ -76,7 +76,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 					if (items === undefined) {
 						return [];
 					}
-					return this.folderChildrenToTreeItems(items, true);
+					return this.folderChildrenToTreeItems(parent, items, true);
 				}
 			}
 			return [];
@@ -109,7 +109,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		return [entities, items];
 	}
 
-	private entityToTreeItems(entity: NodeInfo): vscode.TreeItem[] {
+	private entityToTreeItems(parent: vscode.TreeItem, entity: NodeInfo): vscode.TreeItem[] {
 		const fileItems = entity.files.map(file => {
 			const fileTypeName = file_type_names[file.fileType];
 			if (!file.path) {
@@ -147,22 +147,33 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
 				color: new vscode.ThemeColor("testing.iconPassed")
 			};
+			(item as any).__parent = parent;
 
 			return item;
 		}).filter(x => x !== null);
 
-		const scriptItems = entity.scriptLinks.map(link => this.scriptLinkToTreeItem(link));
+		const scriptItems = entity.scriptLinks.map(link => this.scriptLinkToTreeItem(parent, link));
 
 		return [...fileItems, ...scriptItems];
 	}
 
-	private scriptLinkToTreeItem(link: ScriptLink): vscode.TreeItem {
+	private scriptLinkToTreeItem(parent: vscode.TreeItem, link: ScriptLink): vscode.TreeItem {
 		const fileName = path.basename(link.scriptPath)
 
 		const item = new vscode.TreeItem(fileName, vscode.TreeItemCollapsibleState.None);
 
-		item.description = `${link.relativePath}:${link.line + 1}`;
-		item.tooltip = `${link.scriptPath}:${link.line + 1}`;
+		item.description = `${link.relativePath}:${link.line + 1}`
+		item.tooltip = `${link.relativePath}:${link.line + 1}`;
+
+		// remove folders above scripts folder if it is included within the path
+		let splitPath = path.normalize(link.relativePath).split(path.sep)
+		if (splitPath.includes("scripts")) {
+			const i = splitPath.findIndex((v) => v === "scripts")
+			if (i !== -1) {
+				item.description = splitPath.slice(i + 1).join("/")
+			}
+		}
+
 
 		// Open the script scrolled to the line the annotation sits on.
 		const uri = vscode.Uri.file(link.scriptPath);
@@ -170,11 +181,13 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		item.command = { command: "vscode.open", title: "Open script", arguments: [uri, { selection }] };
 
 		item.contextValue = 'node_entity_script';
-		item.resourceUri = uri
+		item.resourceUri = uri;
+		(item as any).__parent = parent;
+
 		return item;
 	}
 
-	private folderChildrenToTreeItems(folder: Folder, isRoot = false): vscode.TreeItem[] {
+	private folderChildrenToTreeItems(parent: vscode.TreeItem, folder: Folder, isRoot = false): vscode.TreeItem[] {
 		return folder.children.map(child => {
 			if (isFolder(child)) {
 				const item = new vscode.TreeItem(child.name, vscode.TreeItemCollapsibleState.Collapsed);
@@ -184,6 +197,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				item.iconPath = vscode.ThemeIcon.Folder;
 				(item as any).__meta = child;
 				item.contextValue = 'folder_' + child.category;
+				(item as any).__parent = parent;
 				return item;
 			} else {
 				const item = new vscode.TreeItem(child.identifier, vscode.TreeItemCollapsibleState.Collapsed);
@@ -199,12 +213,113 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 				item.contextValue = 'node_' + child.category;
 				item.tooltip = child.identifier;
-
-				// item.id = `${child.category}-${child.identifier}`;
+				(item as any).__parent = parent;
 
 				(item as any).__meta = child;
 				return item;
 			}
 		});
 	}
+
+	public getParent(node?: vscode.TreeItem): (vscode.TreeItem | null) {
+		if (node === undefined) {
+			return null
+		}
+
+		const parent = (node as any).__parent;
+
+		return parent
+	}
+
+	public openNode(root: Category, identifier: string, treeView: vscode.TreeView<vscode.TreeItem>) {
+		const rootNode = this.getChildren()[0]
+		// treeView.reveal(rootNode, {})
+
+		if (root === "entities") {
+			const projectData = getProjectData();
+			if (projectData === undefined) {
+				return;
+			}
+			const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
+
+			const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
+			if (parsedProject === void 0) {
+				vscode.window.showErrorMessage("Unexpected Error");
+				return;
+			}
+			const entities = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
+			if (entities === undefined) {
+				return;
+			}
+			const route = findIdentifierInFolder(entities, identifier)
+			let currentTail = this.getChildren()[0]
+			for (const i of route) {
+				treeView.reveal(currentTail, {
+					expand: true
+				})
+				const children = this.getChildren(currentTail)
+				if (children.length === 0) {
+					break
+				} else {
+					currentTail = children[i]
+				}
+			}
+		} else if (root === "items") {
+			const projectData = getProjectData();
+			if (projectData === undefined) {
+				return;
+			}
+			const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
+
+			const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
+			if (parsedProject === void 0) {
+				vscode.window.showErrorMessage("Unexpected Error");
+				return;
+			}
+			const items = parseItemsInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
+			if (items === undefined) {
+				return;
+			}
+
+			// return this.folderChildrenToTreeItems(parent, items, true);
+			const route = findIdentifierInFolder(items, identifier)
+			route.pop()
+			let currentTail = this.getChildren()[1]
+			for (const i of route) {
+				treeView.reveal(currentTail, {
+					expand: true
+				})
+				const children = this.getChildren(currentTail)
+				if (children.length === 0) {
+					break
+				} else {
+					currentTail = children[i]
+				}
+			}
+			treeView.reveal(currentTail, {
+				expand: true
+			})
+		}
+	}
+}
+
+// returns a list of indexes to follow. always ends in a 0.
+function findIdentifierInFolder(folder: Node, identifier: string): number[] {
+	if (folder.type === "entity") {
+		if (folder.identifier === identifier) {
+			return [0]
+		}
+	} else if (folder.type === "folder") {
+		for (const childIndex in folder.children) {
+			const child = folder.children[childIndex]
+			const s = findIdentifierInFolder(child, identifier)
+			if (s.length > 0) {
+				return [Number(childIndex), ...s]
+			}
+		}
+		return []
+	} else {
+		throw Error("not intended to work with type " + folder.type)
+	}
+	return []
 }

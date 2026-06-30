@@ -44,6 +44,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 	registerAllCommands(context)
 	registerVanillaDataCommands(context)
-	registerScriptLinkCommands(context)
+	registerScriptLinkCommands(context, treeView as vscode.TreeView<vscode.TreeItem>, domainGroupViewer)
 	registerScriptLinkDiagnostics(context)
 }

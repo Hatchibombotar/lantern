@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import { parseProject, ParsedProject } from './analysis/parseProject';
 import { getProjectData } from './analysis/projectData';
+import { DomainGroupViewer } from './domainViewer/DomainGroupViewer';
+import { Category } from './domainViewer/createFolderStructure';
 
-export default function registerScriptLinkCommands(context: vscode.ExtensionContext) {
+export default function registerScriptLinkCommands(context: vscode.ExtensionContext , treeView: vscode.TreeView<vscode.TreeItem>, treeDataProvider: DomainGroupViewer) {
 	context.subscriptions.push(
 		linkScript(),
-		openLinkedIdentifier(),
+		openLinkedIdentifier(treeView, treeDataProvider),
 	);
 }
 
@@ -102,8 +104,8 @@ function linkScript() {
 
 // Invoked from the CodeLens above a `@lantern` marker — opens the linked
 // entity/item's definition file.
-function openLinkedIdentifier() {
-	return vscode.commands.registerCommand("bedrockLantern.openLinkedIdentifier", async (identifier: string) => {
+function openLinkedIdentifier(treeView: vscode.TreeView<vscode.TreeItem>, treeDataProvider: DomainGroupViewer) {
+	return vscode.commands.registerCommand("bedrockLantern.openLinkedIdentifier", async (identifier: string, category: Category) => {
 		const parsedProject = getParsedProject();
 		if (parsedProject === undefined) {
 			return;
@@ -116,6 +118,7 @@ function openLinkedIdentifier() {
 			vscode.window.showWarningMessage(`Lantern: no file found for ${identifier}.`);
 			return;
 		}
-		await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(target.exactPath));
+
+		treeDataProvider.openNode(category, identifier, treeView)
 	});
 }
