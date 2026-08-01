@@ -6,7 +6,7 @@ import { parseScriptAnnotations } from '../analysis/scriptLinks';
 import { getProjectData } from '../analysis/projectData';
 
 // Warns about `@lantern` annotations that reference unknown identifiers (typos /
-// renames) or regions missing their `@lantern:endregion`.
+// renames)
 export function registerScriptLinkDiagnostics(context: vscode.ExtensionContext) {
 	const collection = vscode.languages.createDiagnosticCollection("lantern-script-links");
 	context.subscriptions.push(collection);

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { parseProject, file_type_names, FileTypes, ScriptLink } from '../analysis/parseProject';
 import { getProjectData } from '../analysis/projectData';
-import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category } from './createFolderStructure';
+import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder } from './createFolderStructure';
 import path from 'path';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -77,6 +77,23 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 						return [];
 					}
 					return this.folderChildrenToTreeItems(parent, items, true);
+				} else if (meta.rootType === "blocks") {
+					const projectData = getProjectData();
+					if (projectData === undefined) {
+						return [];
+					}
+					const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
+
+					const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
+					if (parsedProject === void 0) {
+						vscode.window.showErrorMessage("Unexpected Error");
+						return [];
+					}
+					const items = parseBlocksInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
+					if (items === undefined) {
+						return [];
+					}
+					return this.folderChildrenToTreeItems(parent, items, true);
 				}
 			}
 			return [];
@@ -105,8 +122,19 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			type: "root",
 			rootType: "items"
 		} as Root;
+		
 
-		return [entities, items];
+		const blocks = new vscode.TreeItem(
+			`blocks`,
+			vscode.TreeItemCollapsibleState.Collapsed
+		);
+		blocks.contextValue = 'folder_blocks';
+		(blocks as any).__meta = {
+			type: "root",
+			rootType: "blocks"
+		} as Root;
+
+		return [entities, items, blocks];
 	}
 
 	private entityToTreeItems(parent: vscode.TreeItem, entity: NodeInfo): vscode.TreeItem[] {
@@ -138,6 +166,8 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				[FileTypes.rp_render_controllers]: "rp/render_controller.svg",
 				[FileTypes.bp_items]: "bp/item.svg",
 				[FileTypes.rp_attachable]: "rp/attachable.svg",
+				[FileTypes.bp_block]: "bp/block.svg",
+				[FileTypes.rp_block_culling_rule]: "rp/block.svg"
 			};
 
 			const icon = icons[file.fileType];
@@ -232,9 +262,6 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 	}
 
 	public openNode(root: Category, identifier: string, treeView: vscode.TreeView<vscode.TreeItem>) {
-		const rootNode = this.getChildren()[0]
-		// treeView.reveal(rootNode, {})
-
 		if (root === "entities") {
 			const projectData = getProjectData();
 			if (projectData === undefined) {

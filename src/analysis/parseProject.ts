@@ -24,7 +24,7 @@ export function filePathsEqual(a: FilePathData, b: FilePathData) {
 }
 
 export function changeFilePathBase(filePath: FilePathData, resourcePackDir: string, behaviorPackDir: string) {
-	const newFilePath = {...filePath}
+	const newFilePath = { ...filePath }
 	if (newFilePath.rootType === "bp") {
 		newFilePath.exactPath = path.join(behaviorPackDir, newFilePath.relativePath)
 	} else {
@@ -56,6 +56,8 @@ export type ParsedProject = {
 	"rp_animation_controllers": Record<SymbolValue, FilePathData>,
 	"rp_render_controllers": Record<SymbolValue, FilePathData>,
 
+	"rp_block_culling_rules": Record<SymbolValue, FilePathData>
+
 	// BP
 	"bp_entity": Record<SymbolValue, {
 		path: FilePathData
@@ -66,6 +68,11 @@ export type ParsedProject = {
 
 
 	"bp_items": Record<SymbolValue, FilePathData>,
+
+	"bp_blocks": Record<SymbolValue, {
+		path: FilePathData,
+		cullingRules: string[]
+	}>,
 
 	"script_links": ScriptLink[],
 }
@@ -79,7 +86,9 @@ export enum FileTypes {
 	bp_animation_controllers,
 	rp_render_controllers,
 	bp_items,
+	bp_block,
 	rp_attachable,
+	rp_block_culling_rule,
 }
 
 export const file_type_names: Record<FileTypes, string> = {
@@ -92,6 +101,8 @@ export const file_type_names: Record<FileTypes, string> = {
 	[FileTypes.rp_render_controllers]: "rp/render_controllers",
 	[FileTypes.bp_items]: "bp/items",
 	[FileTypes.rp_attachable]: "rp/attachables",
+	[FileTypes.bp_block]: "bp/blocks",
+	[FileTypes.rp_block_culling_rule]: "rp/block_culling"
 }
 
 export function getDetailedPathInfo(resourcePackDir: string, behaviorPackDir: string, exactPath: string): FilePathData {
@@ -173,14 +184,14 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 
 		// FINISH
 		const seperately_referenced_animation_controllers =
-		rp_entity["minecraft:client_entity"].description.animation_controllers ?
-		rp_entity["minecraft:client_entity"].description.animation_controllers.map((x: {[ac: string]: string}) => Object.values(x)).flat() : []
+			rp_entity["minecraft:client_entity"].description.animation_controllers ?
+				rp_entity["minecraft:client_entity"].description.animation_controllers.map((x: { [ac: string]: string }) => Object.values(x)).flat() : []
 
 		rp_entities[identifier] = {
 			path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, entity_path),
 			animations: animations as string[],
 			seperately_referenced_animation_controllers: seperately_referenced_animation_controllers as string[],
-			
+
 			render_controllers
 		}
 	}
@@ -277,6 +288,7 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 		}
 	}
 
+	// ITEMS
 	const bp_items: ParsedProject["bp_items"] = {}
 	const bp_item_files = fs.globSync(path.join(behaviorPackDir, "./items/**/*.json"))
 	for (const path of bp_item_files) {
@@ -286,6 +298,42 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 
 		bp_items[identifier] = getDetailedPathInfo(resourcePackDir, behaviorPackDir, path)
 	}
+
+	// BLOCKS
+
+	const rp_block_culling_rules: ParsedProject["rp_block_culling_rules"] = {}
+	const culling_rule_files = fs.globSync(path.join(resourcePackDir, "./block_culling/**/*.json"))
+	for (const path of culling_rule_files) {
+		const file = fs.readFileSync(path).toString()
+		const item = JSONC.parse(file)
+		const identifier = item["minecraft:block_culling_rules"].description.identifier
+
+		rp_block_culling_rules[identifier] = getDetailedPathInfo(resourcePackDir, behaviorPackDir, path)
+	}
+
+	const bp_blocks: ParsedProject["bp_blocks"] = {}
+	const bp_block_files = fs.globSync(path.join(behaviorPackDir, "./blocks/**/*.json"))
+	for (const path of bp_block_files) {
+		const file = fs.readFileSync(path).toString()
+		const item = JSONC.parse(file)
+		const identifier = item["minecraft:block"].description.identifier
+
+		const geometryComponents = getAllInstancesOfComponentInJSON(item, "minecraft:block", "minecraft:geometry")
+
+		const cullingIdentifiers: SymbolValue[] = []
+		for (const geo of geometryComponents) {
+			if (geo.culling && !cullingIdentifiers.includes(geo.culling)) {
+				cullingIdentifiers.push(geo.culling)
+			}
+		}
+
+		bp_blocks[identifier] = {
+			path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, path),
+			cullingRules: cullingIdentifiers
+		}
+	}
+
+	// SCRIPTS
 
 	const script_links: ScriptLink[] = []
 	if (scanRoot && fs.existsSync(scanRoot)) {
@@ -326,7 +374,29 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 		bp_items: bp_items,
 		rp_attachables: rp_attachables,
 
+		bp_blocks: bp_blocks,
+		rp_block_culling_rules: rp_block_culling_rules,
+
 		script_links,
 	}
 	return parsedProject
+}
+
+function getAllInstancesOfComponentInJSON(file: any, rootObject: string, componentName: string): any[] {
+	const instances: any[] = []
+	for (const [componentKey, componentValue] of Object.entries(file[rootObject]?.components ?? {})) {
+		if (componentKey === componentName) {
+			instances.push(componentValue)
+		}
+	}
+
+	for (const permutation of file[rootObject]?.permutations ?? []) {
+		for (const [componentKey, componentValue] of Object.entries(permutation?.components ?? {})) {
+			if (componentKey === componentName) {
+				instances.push(componentValue)
+			}
+		}
+	}
+
+	return instances
 }

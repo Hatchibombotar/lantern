@@ -5,7 +5,7 @@ export type ProjectFile = { fileType: FileTypes; path: FilePathData; };
 
 import { FileTypes, getDetailedPathInfo, FilePathData, ParsedProject, ScriptLink } from "../analysis/parseProject"
 
-export type Category = "entities" | "items"
+export type Category = "entities" | "items" | "blocks"
 
 export type Root = {
 	type: "root",
@@ -15,21 +15,20 @@ export type Root = {
 export type Node = Root | Folder | NodeInfo
 
 export type Folder = {
-    type: "folder"
-    name: string
-    path: string
-    children: (NodeInfo | Folder)[],
-    category: Category
+	type: "folder"
+	name: string
+	path: string
+	children: (NodeInfo | Folder)[],
+	category: Category
 }
 export type NodeInfo = {
-    type: "entity",
-    identifier: string,
-    path: string
-    files: ProjectFile[],
-    scriptLinks: ScriptLink[],
-    category: Category
+	type: "entity",
+	identifier: string,
+	path: string
+	files: ProjectFile[],
+	scriptLinks: ScriptLink[],
+	category: Category
 }
-
 
 export function parseEntitiesInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
@@ -155,63 +154,67 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 			continue
 		}
 
-		const attachable = projectData.rp_attachables[identifier]
+		const files = getFilesForItem(projectData, identifier)
 
 		const entityInfo: NodeInfo = {
 			type: "entity",
 			identifier: identifier,
-			files: [
-				{ fileType: FileTypes.bp_items, path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, BPItemFile) },
-			],
+			files,
 			scriptLinks: getScriptsForIdentifier(projectData, identifier, "items"),
 			category: "items",
 			path: folderPath
 		}
-		if (attachable) {
-			entityInfo.files.push(
-				{ fileType: FileTypes.rp_attachable, path: attachable.path },
+
+		folder.children.push(entityInfo)
+	}
+
+	if (!isRoot && folder.children.length === 1 && isFolder(folder.children[0])) {
+		const subfolder = folder.children[0]
+		subfolder.name = folder.name + "\\" + subfolder.name
+		return subfolder
+	}
+
+	return folder
+}
+
+export function parseBlocksInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
+	const folder: Folder = {
+		type: "folder",
+		children: [],
+		name: folderPath.split("\\").at(-1) ?? "<folder>",
+		category: "blocks",
+		path: folderPath
+	}
+
+	const BPPath = path.join(behaviorPackDir, "./blocks/", folderPath)
+
+	for (const subfolder of fs.readdirSync(BPPath)) {
+		const subfolderPath = path.join(folderPath, subfolder)
+		const stat = fs.statSync(path.join(BPPath, subfolder))
+		if (stat.isDirectory()) {
+			folder.children.push(
+				parseBlocksInFolder(subfolderPath, projectData, behaviorPackDir, resourcePackDir)
 			)
-			for (const rp_animation of attachable.animations) {
-				if (projectData.rp_anims[rp_animation] !== undefined) {
-					const path = projectData.rp_anims[rp_animation]
-					if (entityInfo.files.find((v) => v.path.exactPath === path.exactPath)) {
-						continue
-					}
-					entityInfo.files.push(
-						{
-							fileType: FileTypes.rp_animation,
-							path: path
-						}
-					)
-				} else if (projectData.rp_animation_controllers[rp_animation] !== undefined) {
-					const path = projectData.rp_animation_controllers[rp_animation]
-					if (entityInfo.files.find((v) => v.path.exactPath === path.exactPath)) {
-						continue
-					}
-					entityInfo.files.push(
-						{
-							fileType: FileTypes.rp_animation_controllers,
-							path: path
-						}
-					)
-				}
-			}
-			for (const rp_render_controller of attachable.render_controllers) {
-				const path = projectData.rp_render_controllers[rp_render_controller]
-				if (!path) {
-					// rc does not exist in this project
-					continue
-				}
-				if (entityInfo.files.find((v) => v.path.exactPath === path.exactPath)) {
-					continue
-				}
-				entityInfo.files.push(
-					{
-						fileType: FileTypes.rp_render_controllers,
-						path: path
-					}
-				)
-			}
+		}
+	}
+
+	const BPBlockFiles = fs.globSync(path.join(BPPath, "/*.json"))
+	for (const BPBlockFile of BPBlockFiles) {
+		const [identifier, bp_block] = Object.entries(projectData.bp_blocks).find(([_, block]) => block.path.exactPath === BPBlockFile) ?? []
+
+		if (identifier === undefined || bp_block === undefined) {
+			continue
+		}
+
+		const files = getFilesForBlock(projectData, identifier)
+
+		const entityInfo: NodeInfo = {
+			type: "entity",
+			identifier: identifier,
+			files,
+			scriptLinks: getScriptsForIdentifier(projectData, identifier, "blocks"),
+			category: "blocks",
+			path: folderPath
 		}
 
 		folder.children.push(entityInfo)
@@ -244,6 +247,8 @@ export function getScriptsForIdentifier(parsedProject: ParsedProject, identifier
 	}
 	return links
 }
+
+// Functions that get all files that are referenced within 
 export function getFilesForEntity(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const bp_entity = parsedProject.bp_entity[identifier];
 	const rp_entity = parsedProject.rp_entity[identifier];
@@ -341,4 +346,86 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 	}
 
 	return projectFiles;
+}
+export function getFilesForItem(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
+	const bp_item = parsedProject.bp_items[identifier];
+
+	const projectFiles: ProjectFile[] = [];
+	if (bp_item) {
+		projectFiles.push(
+			{ fileType: FileTypes.bp_items, path: bp_item }
+		);
+
+		const attachable = parsedProject.rp_attachables[identifier]
+
+		if (attachable) {
+			projectFiles.push(
+				{ fileType: FileTypes.rp_attachable, path: attachable.path },
+			)
+			for (const rp_animation of attachable.animations) {
+				if (parsedProject.rp_anims[rp_animation] !== undefined) {
+					const path = parsedProject.rp_anims[rp_animation]
+					if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
+						continue
+					}
+					projectFiles.push(
+						{
+							fileType: FileTypes.rp_animation,
+							path: path
+						}
+					)
+				} else if (parsedProject.rp_animation_controllers[rp_animation] !== undefined) {
+					const path = parsedProject.rp_animation_controllers[rp_animation]
+					if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
+						continue
+					}
+					projectFiles.push(
+						{
+							fileType: FileTypes.rp_animation_controllers,
+							path: path
+						}
+					)
+				}
+			}
+			for (const rp_render_controller of attachable.render_controllers) {
+				const path = parsedProject.rp_render_controllers[rp_render_controller]
+				if (!path) {
+					// rc does not exist in this project
+					continue
+				}
+				if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
+					continue
+				}
+				projectFiles.push(
+					{
+						fileType: FileTypes.rp_render_controllers,
+						path: path
+					}
+				)
+			}
+		}
+	}
+
+	return projectFiles;
+}
+
+export function getFilesForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
+	const block = parsedProject.bp_blocks[identifier]
+	const files: ProjectFile[] = []
+	if (block) {
+		files.push(
+			{ fileType: FileTypes.bp_block, path: block.path }
+		)
+	}
+
+	for (const rule of block.cullingRules) {
+		const cullingRule = parsedProject.rp_block_culling_rules[rule]
+		if (cullingRule) {
+			files.push(
+				{ fileType: FileTypes.rp_block_culling_rule, path: cullingRule}
+			)
+		}
+	}
+
+	return files
 }

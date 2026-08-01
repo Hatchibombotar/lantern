@@ -14,6 +14,7 @@ export type ScriptAnnotation = {
 
 const ENTITIES_RE = /^\s*\/\/\s*@lantern-links-entities\s+(\[[\s\S]*?\])\s*$/
 const ITEMS_RE = /^\s*\/\/\s*@lantern-links-items\s+(\[[\s\S]*?\])\s*$/
+const BLOCKS_RE = /^\s*\/\/\s*@lantern-links-blocks\s+(\[[\s\S]*?\])\s*$/
 
 // Parse the bracketed payload (a JSON/JSONC array of identifier strings) into a
 // clean string list. Tolerant: malformed payloads yield an empty list.
@@ -48,6 +49,7 @@ export function parseScriptAnnotations(content: string): ScriptAnnotation[] {
 
 		collect(ENTITIES_RE, "entities")
 		collect(ITEMS_RE, "items")
+		collect(BLOCKS_RE, "blocks")
 	}
 
 	return annotations
