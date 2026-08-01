@@ -408,7 +408,6 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 
 	return projectFiles;
 }
-
 export function getFilesForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const block = parsedProject.bp_blocks[identifier]
 	const files: ProjectFile[] = []

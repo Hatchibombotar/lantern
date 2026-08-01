@@ -300,7 +300,6 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 	}
 
 	// BLOCKS
-
 	const rp_block_culling_rules: ParsedProject["rp_block_culling_rules"] = {}
 	const culling_rule_files = fs.globSync(path.join(resourcePackDir, "./block_culling/**/*.json"))
 	for (const path of culling_rule_files) {

@@ -165,8 +165,8 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
     // 4. Rename files
     const initialRenamedFiles: [ProjectFile, string][] = []
 
+    // rename files roughly based on renamed entity
     for (const file of files) {
-        
         const { dir, base } = path.parse(file.path.relativePath)
 
         const splitBase = base.split(".")
