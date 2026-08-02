@@ -130,7 +130,7 @@ function createItem(context: vscode.ExtensionContext) {
 function entityCopyIdentifier(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCopyIdentifier", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type === "entity") {
+        if (meta?.type === "element") {
             vscode.env.clipboard.writeText(meta.identifier)
             vscode.window.showInformationMessage(`Copied identifier ${meta.identifier} to clipboard.`)
         }
@@ -139,7 +139,7 @@ function entityCopyIdentifier(context: vscode.ExtensionContext) {
 function entityCreateBPEntity(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCreateBPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
         if (bpEntityFile !== undefined) {
@@ -168,7 +168,7 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCreateBPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         const existingBPAnimations = getFilesOfType(FileTypes.bp_animation, meta.files)
         const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
@@ -298,7 +298,7 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCreateBPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         const existingBPAnimationControllers = getFilesOfType(FileTypes.bp_animation_controllers, meta.files)
         const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
@@ -426,7 +426,7 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
 function entityCreateRPEntity(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCreateRPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         for (const file of meta.files) {
             if (file.fileType === FileTypes.rp_entity) {
@@ -457,7 +457,7 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCreateRPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         const existingRPAnimations = getFilesOfType(FileTypes.rp_animation, meta.files)
         const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
@@ -586,7 +586,7 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCreateRPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         const existingRPAnimationControllers = getFilesOfType(FileTypes.rp_animation_controllers, meta.files)
         const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
@@ -715,7 +715,7 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.entityCreateRPRenderController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "entities") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         const existingRPRenderControllers = getFilesOfType(FileTypes.rp_render_controllers, meta.files)
         const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
@@ -815,7 +815,7 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
 function itemCopyIdentifier() {
     return vscode.commands.registerCommand("bedrockLantern.itemCopyIdentifier", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type === "entity") {
+        if (meta?.type === "element") {
             vscode.env.clipboard.writeText(meta.identifier)
             vscode.window.showInformationMessage(`Copied identifier ${meta.identifier} to clipboard.`)
         }
@@ -824,7 +824,7 @@ function itemCopyIdentifier() {
 function itemCreateBPItem(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.itemCreateBPItem", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
         const bpItem = getFilesOfType(FileTypes.bp_items, meta.files)[0]
         if (bpItem !== undefined) {
@@ -853,7 +853,7 @@ function itemCreateBPItem(context: vscode.ExtensionContext) {
 function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPEntity", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
         for (const file of meta.files) {
             if (file.fileType === FileTypes.rp_entity) {
@@ -884,7 +884,7 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
     return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPAnimation", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
         const existingRPAnimations = getFilesOfType(FileTypes.rp_animation, meta.files)
         const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
@@ -1013,7 +1013,7 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
     return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPAnimationController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
         const existingRPAnimationControllers = getFilesOfType(FileTypes.rp_animation_controllers, meta.files)
         const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
@@ -1142,7 +1142,7 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
     return vscode.commands.registerCommand("bedrockLantern.itemAttachableCreateRPRenderController", async (element: vscode.TreeItem) => {
         const meta = (element as any).__meta as (Node) | undefined;
 
-        if (meta?.type !== "entity" || meta.category !== "items") throw Error("Unexpected context node.")
+        if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
         const existingRPRenderControllers = getFilesOfType(FileTypes.rp_render_controllers, meta.files)
         const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]

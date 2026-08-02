@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { parseProject, file_type_names, FileTypes, ScriptLink } from '../analysis/parseProject';
 import { getProjectData } from '../analysis/projectData';
-import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder } from './createFolderStructure';
+import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder, ProjectFile, FileFolder } from './createFolderStructure';
 import path from 'path';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -40,8 +40,10 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				return [];
 			} else if (isFolder(meta)) {
 				return this.folderChildrenToTreeItems(parent, meta);
-			} else if (meta.type === "entity") {
+			} else if (meta.type === "element") {
 				return this.entityToTreeItems(parent, meta);
+			} else if (meta.type === "fileFolder") {
+				return this.expandFileFolder(parent, meta);
 			} else if (meta.type === "root") {
 				if (meta.rootType === "entities") {
 					const projectData = getProjectData();
@@ -102,6 +104,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		}
 	}
 
+	// The "root" folders: `entities`, `items`, `blocks` etc.
 	private getRootChildren(): vscode.TreeItem[] {
 		const entities = new vscode.TreeItem(
 			`entities`,
@@ -122,7 +125,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			type: "root",
 			rootType: "items"
 		} as Root;
-		
+
 
 		const blocks = new vscode.TreeItem(
 			`blocks`,
@@ -137,54 +140,128 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		return [entities, items, blocks];
 	}
 
+	// The contents of a node e.g. an entity, item node
 	private entityToTreeItems(parent: vscode.TreeItem, entity: NodeInfo): vscode.TreeItem[] {
-		const fileItems = entity.files.map(file => {
-			const fileTypeName = file_type_names[file.fileType];
-			if (!file.path) {
-				console.error("missing file path" + file.fileType + JSON.stringify(entity));
-				return null;
+		const children: vscode.TreeItem[] = []
+
+		// Show BP files
+		for (const file of entity.files) {
+			if (file.path.rootType === "bp") {
+				children.push(
+					this.fileToTreeItem(parent, file)
+				)
 			}
-			const item = new vscode.TreeItem(
-				`${fileTypeName}`,
-				vscode.TreeItemCollapsibleState.None
-			);
-			item.description = file.path.exactPath.split("\\").at(-1);
-			const fileUri = vscode.Uri.file(file.path.exactPath);
-			item.command = {
-				command: "vscode.open",
-				title: "Open " + fileTypeName,
-				arguments: [fileUri]
+		}
+
+		// Show Scripts
+		for (const link of entity.scriptLinks) {
+			children.push(
+				this.scriptLinkToTreeItem(parent, link)
+			)
+		}
+
+		// Show RP files
+		for (const file of entity.files) {
+			if (file.path.rootType === "rp") {
+				children.push(
+					this.fileToTreeItem(parent, file)
+				)
+			}
+		}
+
+		// Show assets
+		if (entity.assets.length > 0) {
+			const icon = {
+				dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "folder.svg"),
+				light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "folder.svg"),
 			};
-			// item.resourceUri = fileUri
-			const icons: Record<FileTypes, string> = {
-				[FileTypes.bp_entity]: "bp/entity.svg",
-				[FileTypes.rp_entity]: "rp/entity.svg",
-				[FileTypes.rp_animation]: "rp/animation.svg",
-				[FileTypes.bp_animation]: "bp/animation.svg",
-				[FileTypes.rp_animation_controllers]: "rp/animation_controller.svg",
-				[FileTypes.bp_animation_controllers]: "bp/animation_controller.svg",
-				[FileTypes.rp_render_controllers]: "rp/render_controller.svg",
-				[FileTypes.bp_items]: "bp/item.svg",
-				[FileTypes.rp_attachable]: "rp/attachable.svg",
-				[FileTypes.bp_block]: "bp/block.svg",
-				[FileTypes.rp_block_culling_rule]: "rp/block.svg"
-			};
 
-			const icon = icons[file.fileType];
+			children.push(this.createFileFolder(
+				parent, "assets", entity.assets,
+				
+				{
+					dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "rp/folder.svg"),
+					light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "rp/folder.svg"),
+				}
+			))
+		}
 
-			item.iconPath = {
-				dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
-				light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
-				color: new vscode.ThemeColor("testing.iconPassed")
-			};
-			(item as any).__parent = parent;
+		return children
+	}
 
-			return item;
-		}).filter(x => x !== null);
+	private expandFileFolder(parent: vscode.TreeItem, fileFolder: FileFolder): vscode.TreeItem[] {
+		const children: vscode.TreeItem[] = []
+		for (const file of fileFolder.files) {
+			children.push(
+				this.fileToTreeItem(parent, file)
+			)
+		}
 
-		const scriptItems = entity.scriptLinks.map(link => this.scriptLinkToTreeItem(parent, link));
+		return children
+	}
 
-		return [...fileItems, ...scriptItems];
+	// A folder that holds project file nodes. Used for the "asset" folders
+	private createFileFolder(parent: vscode.TreeItem, label: string | vscode.TreeItemLabel, files: ProjectFile[], icon?: vscode.TreeItem["iconPath"]) {
+		const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
+		if (icon) {
+			item.iconPath = icon
+		} else {
+			item.iconPath = vscode.ThemeIcon.Folder;
+		}
+
+		const meta: FileFolder = {
+			type: "fileFolder",
+			files,
+		};
+
+		(item as any).__meta = meta;
+		// item.contextValue = 'folder_';
+		(item as any).__parent = parent;
+		return item;
+	}
+
+	private fileToTreeItem(parent: vscode.TreeItem, file: ProjectFile): vscode.TreeItem {
+		const fileTypeName = file_type_names[file.fileType];
+		if (!file.path) {
+			throw new Error("missing file path for file " + file.fileType)
+		}
+		const item = new vscode.TreeItem(
+			`${fileTypeName}`,
+			vscode.TreeItemCollapsibleState.None
+		);
+		item.description = file.path.exactPath.split("\\").at(-1);
+		const fileUri = vscode.Uri.file(file.path.exactPath);
+		item.command = {
+			command: "vscode.open",
+			title: "Open " + fileTypeName,
+			arguments: [fileUri]
+		};
+		// item.resourceUri = fileUri
+		const icons: Record<FileTypes, string> = {
+			[FileTypes.bp_entity]: "bp/entity.svg",
+			[FileTypes.rp_entity]: "rp/entity.svg",
+			[FileTypes.rp_animation]: "rp/animation.svg",
+			[FileTypes.bp_animation]: "bp/animation.svg",
+			[FileTypes.rp_animation_controllers]: "rp/animation_controller.svg",
+			[FileTypes.bp_animation_controllers]: "bp/animation_controller.svg",
+			[FileTypes.rp_render_controllers]: "rp/render_controller.svg",
+			[FileTypes.bp_items]: "bp/item.svg",
+			[FileTypes.rp_attachable]: "rp/attachable.svg",
+			[FileTypes.bp_block]: "bp/block.svg",
+			[FileTypes.rp_block_culling_rule]: "rp/block.svg",
+			[FileTypes.rp_model]: "rp/model.svg",
+			[FileTypes.rp_texture]: "rp/image.svg",
+		};
+
+		const icon = icons[file.fileType];
+
+		item.iconPath = {
+			dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
+			light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', icon),
+		};
+		(item as any).__parent = parent;
+
+		return item;
 	}
 
 	private scriptLinkToTreeItem(parent: vscode.TreeItem, link: ScriptLink): vscode.TreeItem {
@@ -236,6 +313,11 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				}
 
 				item.iconPath = new vscode.ThemeIcon('file', new vscode.ThemeColor('bedrockLantern.genericFile'));
+
+				item.iconPath = {
+					dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "product/file_coloured.svg"),
+					light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "product/file_coloured.svg"),
+				};
 				// item.iconPath = vscode.ThemeIcon.File;
 				item.label = {
 					label: child.identifier,
@@ -332,7 +414,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 // returns a list of indexes to follow. always ends in a 0.
 function findIdentifierInFolder(folder: Node, identifier: string): number[] {
-	if (folder.type === "entity") {
+	if (folder.type === "element") {
 		if (folder.identifier === identifier) {
 			return [0]
 		}

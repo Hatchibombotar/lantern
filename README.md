@@ -81,3 +81,5 @@ If you have opened an existing `regolith`/`dash`/`bridge`/`bedrockcli` project t
 - The icons in the sidebar were taken from [SirLich/bedrock-addon-icons](https://github.com/SirLich/bedrock-addon-icons/tree/master) [[LICENSE](https://github.com/SirLich/bedrock-addon-icons/blob/master/LICENSE)]
 
 - This includes icons from Godot. [[LICENSE](https://github.com/godotengine/godot/blob/master/LICENSE.txt)]
+
+- File and folder icons are taken from [microsoft/vscode-codicons](https://github.com/microsoft/vscode-codicons) [[LICENSE](https://github.com/microsoft/vscode-codicons/blob/main/LICENSE)]

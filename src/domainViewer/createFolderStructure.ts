@@ -12,7 +12,7 @@ export type Root = {
 	rootType: Category
 }
 
-export type Node = Root | Folder | NodeInfo
+export type Node = Root | Folder | NodeInfo | FileFolder
 
 export type Folder = {
 	type: "folder"
@@ -22,12 +22,18 @@ export type Folder = {
 	category: Category
 }
 export type NodeInfo = {
-	type: "entity",
+	type: "element",
 	identifier: string,
 	path: string
 	files: ProjectFile[],
+	assets: ProjectFile[],
 	scriptLinks: ScriptLink[],
 	category: Category
+}
+
+export type FileFolder = {
+	type: "fileFolder",
+	files: ProjectFile[],
 }
 
 export function parseEntitiesInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
@@ -103,14 +109,16 @@ export function parseEntitiesInFolder(folderPath: string, projectData: ParsedPro
 
 	for (const identifier of entityIdentifiers) {
 		const files = getFilesForEntity(projectData, identifier)
+		const assets = getAssetsForEntity(projectData, identifier)
 
 		const entityInfo: NodeInfo = {
-			type: "entity",
+			type: "element",
 			identifier: identifier,
-			files: files,
+			files,
+			assets: assets,
 			scriptLinks: getScriptsForIdentifier(projectData, identifier, "entities"),
 			category: "entities",
-			path: folderPath
+			path: folderPath,
 		}
 
 		folder.children.push(entityInfo)
@@ -157,12 +165,13 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 		const files = getFilesForItem(projectData, identifier)
 
 		const entityInfo: NodeInfo = {
-			type: "entity",
+			type: "element",
 			identifier: identifier,
 			files,
 			scriptLinks: getScriptsForIdentifier(projectData, identifier, "items"),
 			category: "items",
-			path: folderPath
+			path: folderPath,
+			assets: [],
 		}
 
 		folder.children.push(entityInfo)
@@ -207,14 +216,16 @@ export function parseBlocksInFolder(folderPath: string, projectData: ParsedProje
 		}
 
 		const files = getFilesForBlock(projectData, identifier)
+		const assets = getAssetsForBlock(projectData, identifier)
 
 		const entityInfo: NodeInfo = {
-			type: "entity",
+			type: "element",
 			identifier: identifier,
 			files,
+			assets,
 			scriptLinks: getScriptsForIdentifier(projectData, identifier, "blocks"),
 			category: "blocks",
-			path: folderPath
+			path: folderPath,
 		}
 
 		folder.children.push(entityInfo)
@@ -425,6 +436,79 @@ export function getFilesForBlock(parsedProject: ParsedProject, identifier: strin
 			)
 		}
 	}
+
+	return files
+}
+
+export function getAssetsForEntity(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
+	const rp_entity = parsedProject.rp_entity[identifier];
+
+	if (rp_entity === undefined) {
+		return []
+	}
+
+	const files: ProjectFile[] = []
+
+	for (const modelIdentifier of rp_entity.models) {
+		const modelPath = parsedProject["rp_models"][modelIdentifier]
+		if (modelPath === undefined) continue
+		if (files.find((v) => v.path.exactPath === modelPath.exactPath)) {
+			continue;
+		}
+
+		files.push({
+			fileType: FileTypes.rp_model,
+			path: modelPath
+		})
+	}
+
+	for (const textureIdentifier of rp_entity.textures) {
+		const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
+		if (texture === undefined) continue
+		for (const textureFile of texture.files) {
+			files.push({
+				fileType: FileTypes.rp_texture,
+				path: textureFile
+			})
+		}
+	}
+
+	return files
+}
+
+
+export function getAssetsForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
+	const bp_block = parsedProject.bp_blocks[identifier];
+
+	if (bp_block === undefined) {
+		return []
+	}
+
+	const files: ProjectFile[] = []
+
+	for (const modelIdentifier of bp_block.models) {
+		const modelPath = parsedProject["rp_models"][modelIdentifier]
+		if (modelPath === undefined) continue
+		if (files.find((v) => v.path.exactPath === modelPath.exactPath)) {
+			continue;
+		}
+
+		files.push({
+			fileType: FileTypes.rp_model,
+			path: modelPath
+		})
+	}
+
+	// for (const textureIdentifier of bp_block.textures) {
+	// 	const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
+	// 	if (texture === undefined) continue
+	// 	for (const textureFile of texture.files) {
+	// 		files.push({
+	// 			fileType: FileTypes.rp_texture,
+	// 			path: textureFile
+	// 		})
+	// 	}
+	// }
 
 	return files
 }

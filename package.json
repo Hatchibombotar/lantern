@@ -27,6 +27,22 @@
           "light": "#f7a725",
           "dark": "#f7a725"
         }
+      },
+      {
+        "id": "bedrockLantern.rpFile",
+        "description": "Color for rp files",
+        "defaults": {
+          "light": "#8da5f3",
+          "dark": "#8da5f3"
+        }
+      },
+      {
+        "id": "bedrockLantern.bpFile",
+        "description": "Color for bp files",
+        "defaults": {
+          "light": "#fc7f7f",
+          "dark": "#fc7f7f"
+        }
       }
     ],
     "viewsContainers": {

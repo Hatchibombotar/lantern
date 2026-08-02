@@ -3,6 +3,9 @@
 All notable changes to the extension will be documented in this file.
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
+## [0.5.0]
+- Hardcoded icons for files, stopping coloured icons from turning white
+- Added asset folders
 
 ## [0.4.0], [0.4.1]
 - Added script linking to the lantern sidebar, [with contributions from Keyyard](https://github.com/Hatchibombotar/lantern/pull/1).

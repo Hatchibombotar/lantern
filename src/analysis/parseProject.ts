@@ -46,6 +46,9 @@ export type ParsedProject = {
 		seperately_referenced_animation_controllers: string[] // used for the 1.8.0 client entity format version as they are not referenced within the animations key.
 		// TODO: make stored location of animation controllers consistent.
 		render_controllers: string[],
+
+		models: SymbolValue[]
+		textures: string[]
 	}>
 	"rp_attachables": Record<SymbolValue, {
 		path: FilePathData
@@ -57,6 +60,14 @@ export type ParsedProject = {
 	"rp_render_controllers": Record<SymbolValue, FilePathData>,
 
 	"rp_block_culling_rules": Record<SymbolValue, FilePathData>
+
+	"rp_models": Record<SymbolValue, FilePathData>
+
+	// The key is the path used in game e.g. textures/entity/creeper/creeper
+	// The files are all files that match the path e.g. png, tga, texture set files
+	"rp_textures": Record<string, {
+		files: FilePathData[]
+	}>
 
 	// BP
 	"bp_entity": Record<SymbolValue, {
@@ -71,7 +82,8 @@ export type ParsedProject = {
 
 	"bp_blocks": Record<SymbolValue, {
 		path: FilePathData,
-		cullingRules: string[]
+		cullingRules: string[],
+		models: SymbolValue[]
 	}>,
 
 	"script_links": ScriptLink[],
@@ -89,6 +101,9 @@ export enum FileTypes {
 	bp_block,
 	rp_attachable,
 	rp_block_culling_rule,
+
+	rp_model,
+	rp_texture,
 }
 
 export const file_type_names: Record<FileTypes, string> = {
@@ -102,7 +117,9 @@ export const file_type_names: Record<FileTypes, string> = {
 	[FileTypes.bp_items]: "bp/items",
 	[FileTypes.rp_attachable]: "rp/attachables",
 	[FileTypes.bp_block]: "bp/blocks",
-	[FileTypes.rp_block_culling_rule]: "rp/block_culling"
+	[FileTypes.rp_block_culling_rule]: "rp/block_culling",
+	[FileTypes.rp_model]: "rp/models",
+	[FileTypes.rp_texture]: "rp/textures",
 }
 
 export function getDetailedPathInfo(resourcePackDir: string, behaviorPackDir: string, exactPath: string): FilePathData {
@@ -187,10 +204,17 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 			rp_entity["minecraft:client_entity"].description.animation_controllers ?
 				rp_entity["minecraft:client_entity"].description.animation_controllers.map((x: { [ac: string]: string }) => Object.values(x)).flat() : []
 
+
+		const models = Object.values(rp_entity["minecraft:client_entity"].description.geometry)
+		const textures = Object.values(rp_entity["minecraft:client_entity"].description.textures)
+
 		rp_entities[identifier] = {
 			path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, entity_path),
 			animations: animations as string[],
 			seperately_referenced_animation_controllers: seperately_referenced_animation_controllers as string[],
+
+			models: models as string[],
+			textures: textures as string[],
 
 			render_controllers
 		}
@@ -320,7 +344,11 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 		const geometryComponents = getAllInstancesOfComponentInJSON(item, "minecraft:block", "minecraft:geometry")
 
 		const cullingIdentifiers: SymbolValue[] = []
+		const models: SymbolValue[] = []
 		for (const geo of geometryComponents) {
+			if (!models.includes(geo.identifier)) {
+				models.push(geo.identifier)
+			}
 			if (geo.culling && !cullingIdentifiers.includes(geo.culling)) {
 				cullingIdentifiers.push(geo.culling)
 			}
@@ -328,7 +356,22 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 
 		bp_blocks[identifier] = {
 			path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, path),
-			cullingRules: cullingIdentifiers
+			cullingRules: cullingIdentifiers,
+			models
+		}
+	}
+
+
+	const rp_models: ParsedProject["rp_models"] = {}
+	const rp_model_files = fs.globSync(path.join(resourcePackDir, "./models/**/*.json"))
+	for (const path of rp_model_files) {
+		const file = fs.readFileSync(path).toString()
+		const parsedFile = JSONC.parse(file)
+
+		for (const model of parsedFile["minecraft:geometry"]) {
+			const identifier = model.description.identifier
+
+			rp_models[identifier] = getDetailedPathInfo(resourcePackDir, behaviorPackDir, path)
 		}
 	}
 
@@ -358,6 +401,27 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 		}
 	}
 
+	const rp_texture_dir_files = fs.globSync(path.join(resourcePackDir, "./textures/**/*.{json,tga,png,jpg,jpeg}"))
+	const rp_textures: ParsedProject["rp_textures"] = {}
+	for (const file of rp_texture_dir_files) {
+		const parsedPath = path.parse(file)
+
+		const inGameTexturePath = path.relative(
+			resourcePackDir,
+			path.join(parsedPath.dir, parsedPath.name)
+		)
+		if (rp_textures[inGameTexturePath] === undefined) {
+			rp_textures[inGameTexturePath] = {
+				files: []
+			}
+		}
+		rp_textures[inGameTexturePath].files.push(
+			getDetailedPathInfo(resourcePackDir, behaviorPackDir, file)
+		)
+	}
+
+
+
 	const parsedProject: ParsedProject = {
 		resourcePackDir: resourcePackDir,
 		behaviorPackDir: behaviorPackDir,
@@ -369,6 +433,9 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 		rp_animation_controllers,
 		rp_render_controllers,
 		bp_entity: bp_entities,
+
+		rp_models: rp_models,
+		rp_textures,
 
 		bp_items: bp_items,
 		rp_attachables: rp_attachables,
