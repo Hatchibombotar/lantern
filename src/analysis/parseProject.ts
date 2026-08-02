@@ -83,7 +83,10 @@ export type ParsedProject = {
 	"bp_blocks": Record<SymbolValue, {
 		path: FilePathData,
 		cullingRules: string[],
-		models: SymbolValue[]
+		models: SymbolValue[],
+
+		textureShortnames: SymbolValue[]
+		textures: string[]
 	}>,
 
 	"script_links": ScriptLink[],
@@ -334,6 +337,32 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 		rp_block_culling_rules[identifier] = getDetailedPathInfo(resourcePackDir, behaviorPackDir, path)
 	}
 
+	const terrainTexturePath = path.join(resourcePackDir, "textures/terrain_texture.json")
+	let terrainTextureData;
+	if (fs.existsSync(terrainTexturePath)) {
+		const terrainTextureFile = fs.readFileSync(terrainTexturePath).toString()
+		const terrainTexture = JSONC.parse(terrainTextureFile)
+
+		terrainTextureData = terrainTexture["texture_data"]
+	}
+
+	const blocksJsonPath = path.join(resourcePackDir, "blocks.json")
+	let blocksJsonData: Record<string, any> | undefined = undefined;
+	if (fs.existsSync(blocksJsonPath)) {
+		const blocksJsonFile = fs.readFileSync(blocksJsonPath).toString()
+		const blocksJson = JSONC.parse(blocksJsonFile)
+
+		blocksJsonData = {}
+
+		for (let [k, v] of Object.entries(blocksJson)) {
+			if (!k.includes(":")) {
+				k = "minecraft:" + k
+			}
+			blocksJsonData[k] = v
+		}
+		blocksJsonData = blocksJson
+	}
+
 	const bp_blocks: ParsedProject["bp_blocks"] = {}
 	const bp_block_files = fs.globSync(path.join(behaviorPackDir, "./blocks/**/*.json"))
 	for (const path of bp_block_files) {
@@ -354,10 +383,50 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 			}
 		}
 
+		const materialInstanceComponents = getAllInstancesOfComponentInJSON(item, "minecraft:block", "minecraft:material_instances")
+		const textureShortnames: SymbolValue[] = []
+		for (const component of materialInstanceComponents) {
+			for (const faceMaterial of Object.values<any>(component)) {
+				const texture = faceMaterial.texture
+				if (!textureShortnames.includes(texture)) {
+					textureShortnames.push(texture)
+				}
+			}
+		}
+
+		if (blocksJsonData && blocksJsonData[identifier]) {
+			if (typeof blocksJsonData[identifier].textures === "string") {
+				textureShortnames.push(blocksJsonData[identifier].textures)
+			} else if (typeof blocksJsonData[identifier] === "object") {
+				textureShortnames.push(...Object.values(blocksJsonData[identifier].textures) as any)
+			}
+		}
+
+		
+		const textures: string[] = []
+		if (terrainTextureData) {
+			for (const shortname of textureShortnames) {
+				const textureData = terrainTextureData[shortname]?.textures
+				if (typeof textureData === "object" && Array.isArray(textureData)) {
+					textures.push(...textureData.map((x: any) => {
+						if (typeof x === "string") {
+							return x
+						} else {
+							return x.path
+						}
+					}))
+				} else {
+					textures.push(textureData)
+				}
+			}
+		}
+
 		bp_blocks[identifier] = {
 			path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, path),
 			cullingRules: cullingIdentifiers,
-			models
+			models,
+			textureShortnames,
+			textures,
 		}
 	}
 

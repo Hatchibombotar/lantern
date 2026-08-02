@@ -499,16 +499,17 @@ export function getAssetsForBlock(parsedProject: ParsedProject, identifier: stri
 		})
 	}
 
-	// for (const textureIdentifier of bp_block.textures) {
-	// 	const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
-	// 	if (texture === undefined) continue
-	// 	for (const textureFile of texture.files) {
-	// 		files.push({
-	// 			fileType: FileTypes.rp_texture,
-	// 			path: textureFile
-	// 		})
-	// 	}
-	// }
+	for (const textureIdentifier of bp_block.textures) {
+		// TODO: Show error objects if it doesn't exist
+		const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
+		if (texture === undefined) continue
+		for (const textureFile of texture.files) {
+			files.push({
+				fileType: FileTypes.rp_texture,
+				path: textureFile
+			})
+		}
+	}
 
 	return files
 }
