@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
-import { parseProject, ParsedProject } from './analysis/parseProject';
+import { ParsedProject } from './analysis/ParsedProject';
 import { getProjectData } from './analysis/projectData';
 import { DomainGroupViewer } from './domainViewer/DomainGroupViewer';
 import { Category } from './domainViewer/createFolderStructure';
+import { ProjectParser } from './analysis/ProjectParser';
 
-export default function registerScriptLinkCommands(context: vscode.ExtensionContext , treeView: vscode.TreeView<vscode.TreeItem>, treeDataProvider: DomainGroupViewer) {
+export default function registerScriptLinkCommands(context: vscode.ExtensionContext, treeView: vscode.TreeView<vscode.TreeItem>, treeDataProvider: DomainGroupViewer) {
 	context.subscriptions.push(
 		linkScript(),
 		openLinkedIdentifier(treeView, treeDataProvider),
@@ -16,7 +17,9 @@ function getParsedProject(): ParsedProject | undefined {
 	if (projectData === undefined) {
 		return undefined;
 	}
-	return parseProject(projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot) || undefined;
+	const parser = new ProjectParser(projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot)
+	const parsedProject = parser.parseAll()
+	return parsedProject || undefined;
 }
 
 // All entity + item identifiers a script can legitimately link to.

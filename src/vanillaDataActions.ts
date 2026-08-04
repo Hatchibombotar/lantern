@@ -4,11 +4,14 @@ import * as fs from 'fs/promises';
 import { simpleGit, SimpleGitProgressEvent } from 'simple-git';
 import { createGlobalStorageDirectory } from './utils';
 import { existsSync } from 'fs';
-import { filePathsEqual, FileTypes, ParsedProject, parseProject } from './analysis/parseProject';
+import { AddonFileTypes } from './AddonFileTypes';
+import { filePathsEqual } from './analysis/FilePathData';
+import { ParsedProject } from './analysis/ParsedProject';
 import { Node, ProjectFile } from './domainViewer/createFolderStructure';
 import { getFilesForEntity } from './domainViewer/createFolderStructure';
 import { getReferencedEntitySymbols, selectRenamedSymbols, Symbol, SymbolType, SymbolValue } from './analysis/symbols';
 import { Importer } from './importer';
+import { ProjectParser } from './analysis/ProjectParser';
 
 // export default function registerVanillaDataCommands(context: vscode.ExtensionContext) {
 //     context.subscriptions.push(
@@ -64,10 +67,11 @@ export default function registerImportEntityFromVanillaData(context: vscode.Exte
             return []
         }
 
-        const parsedProject = parseProject(
+        const parser = new ProjectParser(
             path.join(samplesFolderPath, "resource_pack"),
             path.join(samplesFolderPath, "behavior_pack"),
         )
+        const parsedProject = parser.parseAll()
         if (parsedProject === undefined) {
             vscode.window.showErrorMessage("Unexpected Error")
             return []
@@ -177,7 +181,7 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
         const newFileBase = splitBase.join(".")
 
         switch (file.fileType) {
-            case FileTypes.bp_entity: {
+            case AddonFileTypes.bp_entity: {
                 if (folderPath) {
                     const newPath = path.join("entities", folderPath, newFileBase)
                     initialRenamedFiles.push(
@@ -189,7 +193,7 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
                 }
                 break;
             }
-            case FileTypes.rp_entity: {
+            case AddonFileTypes.rp_entity: {
                 if (folderPath) {
                     const newPath = path.join("entity", folderPath, newFileBase)
                     initialRenamedFiles.push(
@@ -201,11 +205,11 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
                 }
                 break;
             }
-            case FileTypes.rp_animation:
-            case FileTypes.bp_animation:
-            case FileTypes.rp_animation_controllers:
-            case FileTypes.bp_animation_controllers:
-            case FileTypes.rp_render_controllers: {
+            case AddonFileTypes.rp_animation:
+            case AddonFileTypes.bp_animation:
+            case AddonFileTypes.rp_animation_controllers:
+            case AddonFileTypes.bp_animation_controllers:
+            case AddonFileTypes.rp_render_controllers: {
                 const newPath = path.join(dir, newFileBase)
                 initialRenamedFiles.push(
                     [
@@ -215,7 +219,7 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
                 )
                 break;
             }
-            case FileTypes.bp_items: {
+            case AddonFileTypes.bp_items: {
                 if (folderPath) {
                     const newPath = path.join("items", folderPath, newFileBase)
                     initialRenamedFiles.push(
@@ -227,7 +231,7 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
                 }
                 break;
             }
-            case FileTypes.rp_attachable: {
+            case AddonFileTypes.rp_attachable: {
                 if (folderPath) {
                     const newPath = path.join("attachables", folderPath, newFileBase)
                     initialRenamedFiles.push(

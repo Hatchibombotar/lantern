@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseProject } from '../analysis/parseProject';
 import { parseScriptAnnotations } from '../analysis/scriptLinks';
 import { getProjectData } from '../analysis/projectData';
+import { ProjectParser } from '../analysis/ProjectParser';
 
 // Warns about `@lantern` annotations that reference unknown identifiers (typos /
 // renames)
@@ -57,7 +57,10 @@ function getKnownIdentifiers(): KnownIdentifiers | undefined {
 	if (projectData === undefined) {
 		return undefined;
 	}
-	const parsedProject = parseProject(projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot);
+	const parser = new ProjectParser(
+		projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot
+	)
+	const parsedProject = parser.parseAll()
 	if (parsedProject === undefined) {
 		return undefined;
 	}

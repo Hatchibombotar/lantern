@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as nodePath from 'path';
 import * as JSONC from "jsonc-parser"
 
-import { FileTypes } from './analysis/parseProject';
+import { AddonFileTypes } from './AddonFileTypes';
 import { getProjectData } from './analysis/projectData';
 import { findOrCreateDestinationPath, getFilesOfType, jsoncModifyandEditWithInitialisedParents as jsoncModify, objectModifyWithInitialisedParents, readTemplate } from './utils';
 import { Node, NodeInfo } from './domainViewer/createFolderStructure';
@@ -141,7 +141,7 @@ function entityCreateBPEntity(context: vscode.ExtensionContext) {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
+        const bpEntityFile = getFilesOfType(AddonFileTypes.bp_entity, meta.files)[0]
         if (bpEntityFile !== undefined) {
             vscode.window.showInformationMessage(`BP entity already exits for entity ${meta.identifier}`)
             return
@@ -170,8 +170,8 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
 
         if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingBPAnimations = getFilesOfType(FileTypes.bp_animation, meta.files)
-        const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
+        const existingBPAnimations = getFilesOfType(AddonFileTypes.bp_animation, meta.files)
+        const bpEntityFile = getFilesOfType(AddonFileTypes.bp_entity, meta.files)[0]
 
         if (!bpEntityFile) {
             return vscode.window.showInformationMessage(`BP entity does not exist for entity ${meta.identifier}`)
@@ -300,8 +300,8 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
 
         if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingBPAnimationControllers = getFilesOfType(FileTypes.bp_animation_controllers, meta.files)
-        const bpEntityFile = getFilesOfType(FileTypes.bp_entity, meta.files)[0]
+        const existingBPAnimationControllers = getFilesOfType(AddonFileTypes.bp_animation_controllers, meta.files)
+        const bpEntityFile = getFilesOfType(AddonFileTypes.bp_entity, meta.files)[0]
 
         if (!bpEntityFile) {
             vscode.window.showInformationMessage(`BP entity does not exist for entity ${meta.identifier}`)
@@ -429,7 +429,7 @@ function entityCreateRPEntity(context: vscode.ExtensionContext) {
         if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
         for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_entity) {
+            if (file.fileType === AddonFileTypes.rp_entity) {
                 vscode.window.showInformationMessage(`RP entity already exits for entity ${meta.identifier}`)
                 return
             }
@@ -459,8 +459,8 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
 
         if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingRPAnimations = getFilesOfType(FileTypes.rp_animation, meta.files)
-        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+        const existingRPAnimations = getFilesOfType(AddonFileTypes.rp_animation, meta.files)
+        const rpEntityFile = getFilesOfType(AddonFileTypes.rp_entity, meta.files)[0]
 
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
@@ -588,8 +588,8 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
 
         if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingRPAnimationControllers = getFilesOfType(FileTypes.rp_animation_controllers, meta.files)
-        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+        const existingRPAnimationControllers = getFilesOfType(AddonFileTypes.rp_animation_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(AddonFileTypes.rp_entity, meta.files)[0]
 
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
@@ -717,8 +717,8 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
 
         if (meta?.type !== "element" || meta.category !== "entities") throw Error("Unexpected context node.")
 
-        const existingRPRenderControllers = getFilesOfType(FileTypes.rp_render_controllers, meta.files)
-        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+        const existingRPRenderControllers = getFilesOfType(AddonFileTypes.rp_render_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(AddonFileTypes.rp_entity, meta.files)[0]
 
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
@@ -826,7 +826,7 @@ function itemCreateBPItem(context: vscode.ExtensionContext) {
         const meta = (element as any).__meta as (Node) | undefined;
         if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
-        const bpItem = getFilesOfType(FileTypes.bp_items, meta.files)[0]
+        const bpItem = getFilesOfType(AddonFileTypes.bp_items, meta.files)[0]
         if (bpItem !== undefined) {
             vscode.window.showInformationMessage(`BP item already exits for entity ${meta.identifier}`)
             return
@@ -856,7 +856,7 @@ function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
         if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
         for (const file of meta.files) {
-            if (file.fileType === FileTypes.rp_entity) {
+            if (file.fileType === AddonFileTypes.rp_entity) {
                 vscode.window.showInformationMessage(`Attachable already exits for item ${meta.identifier}`)
                 return
             }
@@ -886,8 +886,8 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
 
         if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
-        const existingRPAnimations = getFilesOfType(FileTypes.rp_animation, meta.files)
-        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+        const existingRPAnimations = getFilesOfType(AddonFileTypes.rp_animation, meta.files)
+        const rpEntityFile = getFilesOfType(AddonFileTypes.rp_entity, meta.files)[0]
 
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)
@@ -1015,8 +1015,8 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
 
         if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
-        const existingRPAnimationControllers = getFilesOfType(FileTypes.rp_animation_controllers, meta.files)
-        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+        const existingRPAnimationControllers = getFilesOfType(AddonFileTypes.rp_animation_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(AddonFileTypes.rp_entity, meta.files)[0]
 
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for item ${meta.identifier}`)
@@ -1144,8 +1144,8 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
 
         if (meta?.type !== "element" || meta.category !== "items") throw Error("Unexpected context node.")
 
-        const existingRPRenderControllers = getFilesOfType(FileTypes.rp_render_controllers, meta.files)
-        const rpEntityFile = getFilesOfType(FileTypes.rp_entity, meta.files)[0]
+        const existingRPRenderControllers = getFilesOfType(AddonFileTypes.rp_render_controllers, meta.files)
+        const rpEntityFile = getFilesOfType(AddonFileTypes.rp_entity, meta.files)[0]
 
         if (!rpEntityFile) {
             vscode.window.showInformationMessage(`RP entity does not exist for entity ${meta.identifier}`)

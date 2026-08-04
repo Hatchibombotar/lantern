@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
-import { parseProject, file_type_names, FileTypes, ScriptLink } from '../analysis/parseProject';
+import { file_type_names, AddonFileTypes } from '../AddonFileTypes';
 import { getProjectData } from '../analysis/projectData';
 import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder, ProjectFile, FileFolder } from './createFolderStructure';
 import path from 'path';
+import { ScriptLink } from '../analysis/ParsedProject';
+import { ProjectParser } from '../analysis/ProjectParser';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
 	private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | null>();
@@ -45,52 +47,31 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			} else if (meta.type === "fileFolder") {
 				return this.expandFileFolder(parent, meta);
 			} else if (meta.type === "root") {
-				if (meta.rootType === "entities") {
-					const projectData = getProjectData();
-					if (projectData === undefined) {
-						return [];
-					}
-					const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
+				// TODO: do this globally; This is currenly parsing the project three times per refresh
+				const projectData = getProjectData();
+				if (projectData === undefined) {
+					return [];
+				}
+				const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
 
-					const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
-					if (parsedProject === void 0) {
-						vscode.window.showErrorMessage("Unexpected Error");
-						return [];
-					}
+				const parser = new ProjectParser(
+					resourcePackDir, behaviorPackDir, workspaceRoot
+				)
+				const parsedProject = parser.parseAll()
+
+				if (meta.rootType === "entities") {
 					const entities = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
 					if (entities === undefined) {
 						return [];
 					}
 					return this.folderChildrenToTreeItems(parent, entities, true);
 				} else if (meta.rootType === "items") {
-					const projectData = getProjectData();
-					if (projectData === undefined) {
-						return [];
-					}
-					const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
-
-					const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
-					if (parsedProject === void 0) {
-						vscode.window.showErrorMessage("Unexpected Error");
-						return [];
-					}
 					const items = parseItemsInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
 					if (items === undefined) {
 						return [];
 					}
 					return this.folderChildrenToTreeItems(parent, items, true);
 				} else if (meta.rootType === "blocks") {
-					const projectData = getProjectData();
-					if (projectData === undefined) {
-						return [];
-					}
-					const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
-
-					const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
-					if (parsedProject === void 0) {
-						vscode.window.showErrorMessage("Unexpected Error");
-						return [];
-					}
 					const items = parseBlocksInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
 					if (items === undefined) {
 						return [];
@@ -178,7 +159,7 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 			children.push(this.createFileFolder(
 				parent, "assets", entity.assets,
-				
+
 				{
 					dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "rp/folder.svg"),
 					light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "rp/folder.svg"),
@@ -237,20 +218,20 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			arguments: [fileUri]
 		};
 		// item.resourceUri = fileUri
-		const icons: Record<FileTypes, string> = {
-			[FileTypes.bp_entity]: "bp/entity.svg",
-			[FileTypes.rp_entity]: "rp/entity.svg",
-			[FileTypes.rp_animation]: "rp/animation.svg",
-			[FileTypes.bp_animation]: "bp/animation.svg",
-			[FileTypes.rp_animation_controllers]: "rp/animation_controller.svg",
-			[FileTypes.bp_animation_controllers]: "bp/animation_controller.svg",
-			[FileTypes.rp_render_controllers]: "rp/render_controller.svg",
-			[FileTypes.bp_items]: "bp/item.svg",
-			[FileTypes.rp_attachable]: "rp/attachable.svg",
-			[FileTypes.bp_block]: "bp/block.svg",
-			[FileTypes.rp_block_culling_rule]: "rp/block.svg",
-			[FileTypes.rp_model]: "rp/model.svg",
-			[FileTypes.rp_texture]: "rp/image.svg",
+		const icons: Record<AddonFileTypes, string> = {
+			[AddonFileTypes.bp_entity]: "bp/entity.svg",
+			[AddonFileTypes.rp_entity]: "rp/entity.svg",
+			[AddonFileTypes.rp_animation]: "rp/animation.svg",
+			[AddonFileTypes.bp_animation]: "bp/animation.svg",
+			[AddonFileTypes.rp_animation_controllers]: "rp/animation_controller.svg",
+			[AddonFileTypes.bp_animation_controllers]: "bp/animation_controller.svg",
+			[AddonFileTypes.rp_render_controllers]: "rp/render_controller.svg",
+			[AddonFileTypes.bp_items]: "bp/item.svg",
+			[AddonFileTypes.rp_attachable]: "rp/attachable.svg",
+			[AddonFileTypes.bp_block]: "bp/block.svg",
+			[AddonFileTypes.rp_block_culling_rule]: "rp/block.svg",
+			[AddonFileTypes.rp_model]: "rp/model.svg",
+			[AddonFileTypes.rp_texture]: "rp/image.svg",
 		};
 
 		const icon = icons[file.fileType];
@@ -344,18 +325,20 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 	}
 
 	public openNode(root: Category, identifier: string, treeView: vscode.TreeView<vscode.TreeItem>) {
-		if (root === "entities") {
-			const projectData = getProjectData();
-			if (projectData === undefined) {
-				return;
-			}
-			const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
+		const projectData = getProjectData();
+		if (projectData === undefined) {
+			return;
+		}
+		const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
 
-			const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
-			if (parsedProject === void 0) {
-				vscode.window.showErrorMessage("Unexpected Error");
-				return;
-			}
+		const parser = new ProjectParser(resourcePackDir, behaviorPackDir, workspaceRoot)
+		const parsedProject = parser.parseAll()
+		if (parsedProject === void 0) {
+			vscode.window.showErrorMessage("Unexpected Error");
+			return;
+		}
+
+		if (root === "entities") {
 			const entities = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
 			if (entities === undefined) {
 				return;
@@ -374,17 +357,6 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				}
 			}
 		} else if (root === "items") {
-			const projectData = getProjectData();
-			if (projectData === undefined) {
-				return;
-			}
-			const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
-
-			const parsedProject = parseProject(resourcePackDir, behaviorPackDir, workspaceRoot);
-			if (parsedProject === void 0) {
-				vscode.window.showErrorMessage("Unexpected Error");
-				return;
-			}
 			const items = parseItemsInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
 			if (items === undefined) {
 				return;

@@ -1,9 +1,12 @@
 import * as path from 'path';
 import * as fs from 'fs';
 
-export type ProjectFile = { fileType: FileTypes; path: FilePathData; };
+export type ProjectFile = { fileType: AddonFileTypes; path: FilePathData; };
 
-import { FileTypes, getDetailedPathInfo, FilePathData, ParsedProject, ScriptLink } from "../analysis/parseProject"
+import { AddonFileTypes } from '../AddonFileTypes';
+import { getDetailedPathInfo } from '../analysis/FilePathData';
+import { FilePathData } from '../analysis/FilePathData';
+import { ParsedProject, ScriptLink } from '../analysis/ParsedProject';
 
 export type Category = "entities" | "items" | "blocks"
 
@@ -268,7 +271,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 	const projectFiles: ProjectFile[] = [];
 	if (bp_entity) {
 		projectFiles.push(
-			{ fileType: FileTypes.bp_entity, path: bp_entity.path }
+			{ fileType: AddonFileTypes.bp_entity, path: bp_entity.path }
 		);
 		for (const bp_animation of bp_entity.animations) {
 			if (parsedProject.bp_anims[bp_animation] !== undefined) {
@@ -278,7 +281,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 				}
 				projectFiles.push(
 					{
-						fileType: FileTypes.bp_animation,
+						fileType: AddonFileTypes.bp_animation,
 						path: path
 					}
 				);
@@ -289,7 +292,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 				}
 				projectFiles.push(
 					{
-						fileType: FileTypes.bp_animation_controllers,
+						fileType: AddonFileTypes.bp_animation_controllers,
 						path: path
 					}
 				);
@@ -298,7 +301,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 	}
 	if (rp_entity) {
 		projectFiles.push(
-			{ fileType: FileTypes.rp_entity, path: rp_entity.path }
+			{ fileType: AddonFileTypes.rp_entity, path: rp_entity.path }
 		);
 		for (const rp_animation of rp_entity.animations) {
 			if (parsedProject.rp_anims[rp_animation] !== undefined) {
@@ -308,7 +311,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 				}
 				projectFiles.push(
 					{
-						fileType: FileTypes.rp_animation,
+						fileType: AddonFileTypes.rp_animation,
 						path: path
 					}
 				);
@@ -319,7 +322,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 				}
 				projectFiles.push(
 					{
-						fileType: FileTypes.rp_animation_controllers,
+						fileType: AddonFileTypes.rp_animation_controllers,
 						path: path
 					}
 				);
@@ -333,7 +336,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 				}
 				projectFiles.push(
 					{
-						fileType: FileTypes.rp_animation_controllers,
+						fileType: AddonFileTypes.rp_animation_controllers,
 						path: path
 					}
 				);
@@ -350,7 +353,7 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 			}
 			projectFiles.push(
 				{
-					fileType: FileTypes.rp_render_controllers,
+					fileType: AddonFileTypes.rp_render_controllers,
 					path: path
 				}
 			);
@@ -365,14 +368,14 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 	const projectFiles: ProjectFile[] = [];
 	if (bp_item) {
 		projectFiles.push(
-			{ fileType: FileTypes.bp_items, path: bp_item.path }
+			{ fileType: AddonFileTypes.bp_items, path: bp_item.path }
 		);
 
 		const attachable = parsedProject.rp_attachables[identifier]
 
 		if (attachable) {
 			projectFiles.push(
-				{ fileType: FileTypes.rp_attachable, path: attachable.path },
+				{ fileType: AddonFileTypes.rp_attachable, path: attachable.path },
 			)
 			for (const rp_animation of attachable.animations) {
 				if (parsedProject.rp_anims[rp_animation] !== undefined) {
@@ -382,7 +385,7 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 					}
 					projectFiles.push(
 						{
-							fileType: FileTypes.rp_animation,
+							fileType: AddonFileTypes.rp_animation,
 							path: path
 						}
 					)
@@ -393,7 +396,7 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 					}
 					projectFiles.push(
 						{
-							fileType: FileTypes.rp_animation_controllers,
+							fileType: AddonFileTypes.rp_animation_controllers,
 							path: path
 						}
 					)
@@ -410,7 +413,7 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 				}
 				projectFiles.push(
 					{
-						fileType: FileTypes.rp_render_controllers,
+						fileType: AddonFileTypes.rp_render_controllers,
 						path: path
 					}
 				)
@@ -425,7 +428,7 @@ export function getFilesForBlock(parsedProject: ParsedProject, identifier: strin
 	const files: ProjectFile[] = []
 	if (block) {
 		files.push(
-			{ fileType: FileTypes.bp_block, path: block.path }
+			{ fileType: AddonFileTypes.bp_block, path: block.path }
 		)
 	}
 
@@ -433,7 +436,7 @@ export function getFilesForBlock(parsedProject: ParsedProject, identifier: strin
 		const cullingRule = parsedProject.rp_block_culling_rules[rule]
 		if (cullingRule) {
 			files.push(
-				{ fileType: FileTypes.rp_block_culling_rule, path: cullingRule}
+				{ fileType: AddonFileTypes.rp_block_culling_rule, path: cullingRule}
 			)
 		}
 	}
@@ -458,7 +461,7 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 		}
 
 		files.push({
-			fileType: FileTypes.rp_model,
+			fileType: AddonFileTypes.rp_model,
 			path: modelPath
 		})
 	}
@@ -468,7 +471,7 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 		if (texture === undefined) continue
 		for (const textureFile of texture.files) {
 			files.push({
-				fileType: FileTypes.rp_texture,
+				fileType: AddonFileTypes.rp_texture,
 				path: textureFile
 			})
 		}
@@ -494,7 +497,7 @@ export function getAssetsForBlock(parsedProject: ParsedProject, identifier: stri
 		}
 
 		files.push({
-			fileType: FileTypes.rp_model,
+			fileType: AddonFileTypes.rp_model,
 			path: modelPath
 		})
 	}
@@ -505,7 +508,7 @@ export function getAssetsForBlock(parsedProject: ParsedProject, identifier: stri
 		if (texture === undefined) continue
 		for (const textureFile of texture.files) {
 			files.push({
-				fileType: FileTypes.rp_texture,
+				fileType: AddonFileTypes.rp_texture,
 				path: textureFile
 			})
 		}
@@ -529,7 +532,7 @@ export function getAssetsForItem(parsedProject: ParsedProject, identifier: strin
 		if (texture === undefined) continue
 		for (const textureFile of texture.files) {
 			files.push({
-				fileType: FileTypes.rp_texture,
+				fileType: AddonFileTypes.rp_texture,
 				path: textureFile
 			})
 		}

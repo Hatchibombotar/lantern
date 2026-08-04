@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ParsedProject } from "./parseProject";
+import { ParsedProject } from './ParsedProject';
 
 export enum SymbolType {
     EntityIdentifer,

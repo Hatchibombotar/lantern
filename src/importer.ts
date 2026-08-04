@@ -1,4 +1,5 @@
-import { changeFilePathBase, FilePathData, filePathsEqual, ParsedProject } from "./analysis/parseProject";
+import { changeFilePathBase, FilePathData, filePathsEqual } from './analysis/FilePathData';
+import { ParsedProject } from './analysis/ParsedProject';
 import { getProjectData, ProjectData } from './analysis/projectData';
 import { Symbol, symbolsEqual, SymbolType, SymbolValue } from "./analysis/symbols";
 import * as fs from 'fs/promises';

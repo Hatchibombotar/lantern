@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as JSONC from "jsonc-parser"
-import { FileTypes as FileType } from "./analysis/parseProject";
+import { AddonFileTypes as FileType } from './AddonFileTypes';
 import { ProjectFile } from './domainViewer/createFolderStructure';
 import nodePath from "path"
 import * as fs from 'fs/promises';
