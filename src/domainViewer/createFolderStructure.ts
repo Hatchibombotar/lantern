@@ -156,24 +156,25 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 
 	const BPItemFiles = fs.globSync(path.join(BPPath, "/*.json"))
 	for (const BPItemFile of BPItemFiles) {
-		const [identifier, bp_item] = Object.entries(projectData.bp_items).find(([_, path]) => path.exactPath === BPItemFile) ?? []
+		const [identifier, bp_item] = Object.entries(projectData.bp_items).find(([_, item]) => item.path.exactPath === BPItemFile) ?? []
 
 		if (identifier === undefined || bp_item === undefined) {
 			continue
 		}
 
 		const files = getFilesForItem(projectData, identifier)
+		const assets = getAssetsForItem(projectData, identifier)
 
 		const entityInfo: NodeInfo = {
 			type: "element",
 			identifier: identifier,
 			files,
+			assets,
 			scriptLinks: getScriptsForIdentifier(projectData, identifier, "items"),
 			category: "items",
 			path: folderPath,
-			assets: [],
 		}
-
+		
 		folder.children.push(entityInfo)
 	}
 
@@ -364,7 +365,7 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 	const projectFiles: ProjectFile[] = [];
 	if (bp_item) {
 		projectFiles.push(
-			{ fileType: FileTypes.bp_items, path: bp_item }
+			{ fileType: FileTypes.bp_items, path: bp_item.path }
 		);
 
 		const attachable = parsedProject.rp_attachables[identifier]
@@ -476,7 +477,6 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 	return files
 }
 
-
 export function getAssetsForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const bp_block = parsedProject.bp_blocks[identifier];
 
@@ -500,6 +500,30 @@ export function getAssetsForBlock(parsedProject: ParsedProject, identifier: stri
 	}
 
 	for (const textureIdentifier of bp_block.textures) {
+		// TODO: Show error objects if it doesn't exist
+		const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
+		if (texture === undefined) continue
+		for (const textureFile of texture.files) {
+			files.push({
+				fileType: FileTypes.rp_texture,
+				path: textureFile
+			})
+		}
+	}
+
+	return files
+}
+
+export function getAssetsForItem(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
+	const bp_items = parsedProject.bp_items[identifier];
+
+	if (bp_items === undefined) {
+		return []
+	}
+
+	const files: ProjectFile[] = []
+
+	for (const textureIdentifier of bp_items.textures) {
 		// TODO: Show error objects if it doesn't exist
 		const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
 		if (texture === undefined) continue

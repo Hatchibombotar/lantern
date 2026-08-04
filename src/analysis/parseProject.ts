@@ -78,7 +78,12 @@ export type ParsedProject = {
 	"bp_animation_controllers": Record<SymbolValue, FilePathData>,
 
 
-	"bp_items": Record<SymbolValue, FilePathData>,
+	"bp_items": Record<SymbolValue, {
+		path: FilePathData,
+
+		textureShortnames: SymbolValue[]
+		textures: string[]
+	}>,
 
 	"bp_blocks": Record<SymbolValue, {
 		path: FilePathData,
@@ -316,6 +321,15 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 	}
 
 	// ITEMS
+	const itemTexturePath = path.join(resourcePackDir, "textures/item_texture.json")
+	let itemTextureData;
+	if (fs.existsSync(itemTexturePath)) {
+		const itemTextureFile = fs.readFileSync(itemTexturePath).toString()
+		const itemTexture = JSONC.parse(itemTextureFile)
+
+		itemTextureData = itemTexture["texture_data"]
+	}
+
 	const bp_items: ParsedProject["bp_items"] = {}
 	const bp_item_files = fs.globSync(path.join(behaviorPackDir, "./items/**/*.json"))
 	for (const path of bp_item_files) {
@@ -323,7 +337,46 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 		const item = JSONC.parse(file)
 		const identifier = item["minecraft:item"].description.identifier
 
-		bp_items[identifier] = getDetailedPathInfo(resourcePackDir, behaviorPackDir, path)
+
+		const iconComponents = getAllInstancesOfComponentInJSON(item, "minecraft:item", "minecraft:icon")
+		const textureShortnames: SymbolValue[] = []
+		for (const component of iconComponents) {
+			if (typeof component === "string") {
+				textureShortnames.push(component)
+			} else if (component.texture !== undefined) {
+				textureShortnames.push(component.texture)
+			} else if (component.textures !== undefined) {
+				for (const texture of Object.values<any>(component.textures)) {
+					if (!textureShortnames.includes(texture)) {
+						textureShortnames.push(texture)
+					}
+				}
+			}
+		}
+
+		const textures: string[] = []
+		if (itemTextureData) {
+			for (const shortname of textureShortnames) {
+				const textureData = itemTextureData[shortname]?.textures
+				if (typeof textureData === "object" && Array.isArray(textureData)) {
+					textures.push(...textureData.map((x: any) => {
+						if (typeof x === "string") {
+							return x
+						} else {
+							return x.path
+						}
+					}))
+				} else {
+					textures.push(textureData)
+				}
+			}
+		}
+
+		bp_items[identifier] = {
+			path: getDetailedPathInfo(resourcePackDir, behaviorPackDir, path),
+			textureShortnames,
+			textures,
+		}
 	}
 
 	// BLOCKS
@@ -402,7 +455,6 @@ export function parseProject(resourcePackDir: string, behaviorPackDir: string, s
 			}
 		}
 
-		
 		const textures: string[] = []
 		if (terrainTextureData) {
 			for (const shortname of textureShortnames) {
