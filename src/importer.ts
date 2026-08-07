@@ -1,6 +1,6 @@
-import { changeFilePathBase, FilePathData, filePathsEqual } from './analysis/FilePathData';
+import { changeFilePathBase, FilePathData, filePathsEqual } from './FilePathData';
 import { ParsedProject } from './analysis/ParsedProject';
-import { getProjectData, ProjectData } from './analysis/projectData';
+import { getProjectContext, ProjectContext } from './analysis/context';
 import { Symbol, symbolsEqual, SymbolType, SymbolValue } from "./analysis/symbols";
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -13,7 +13,7 @@ export class Importer {
     symbolsToImport: Symbol[]
     renamedSymbols: [Symbol, SymbolValue][]
     renamedFiles: [FilePathData, string][]
-    projectData: ProjectData
+    projectContext: ProjectContext
 
     constructor(
         importedProject: ParsedProject,
@@ -26,12 +26,12 @@ export class Importer {
         this.renamedSymbols = renamedSymbols
         this.renamedFiles = renamedFiles
         
-        const projectData = getProjectData()
-        if (!projectData) {
+        const projectContext = getProjectContext()
+        if (!projectContext) {
             throw Error("")
         }
 
-        this.projectData = projectData
+        this.projectContext = projectContext
     }
 
 
@@ -157,7 +157,7 @@ export class Importer {
             )
 
             const destinationFilePath = this.getDestinationFilePath(bp_entity.path)
-            await writeFileInProject(this.projectData, destinationFilePath, result)
+            await writeFileInProject(this.projectContext, destinationFilePath, result)
 
             // TODO: rename BP animations and animation controllers.
         }
@@ -239,7 +239,7 @@ export class Importer {
             }
 
             const destinationFilePath = this.getDestinationFilePath(rp_entity.path)
-            await writeFileInProject(this.projectData, destinationFilePath, result)
+            await writeFileInProject(this.projectContext, destinationFilePath, result)
         }
     }
 
@@ -286,7 +286,7 @@ export class Importer {
 
         
         const destinationFilePath = this.getDestinationFilePath(filePath)
-        await writeFileInProject(this.projectData, destinationFilePath, result)
+        await writeFileInProject(this.projectContext, destinationFilePath, result)
         
     }
 
@@ -313,15 +313,15 @@ export class Importer {
 
         destinationFilePath = changeFilePathBase(
             destinationFilePath,
-            this.projectData.resourcePackDir,
-            this.projectData.behaviorPackDir
+            this.projectContext.resourcePackDir,
+            this.projectContext.behaviorPackDir
         )
 
         return destinationFilePath
     }
 }
 
-async function writeFileInProject(projectData: ProjectData, filePath: FilePathData, content: string) {
+async function writeFileInProject(projectData: ProjectContext, filePath: FilePathData, content: string) {
     // console.log("---SAVING---")
     // console.log(filePath.exactPath)
     // console.log(content)

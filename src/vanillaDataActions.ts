@@ -5,7 +5,7 @@ import { simpleGit, SimpleGitProgressEvent } from 'simple-git';
 import { createGlobalStorageDirectory } from './utils';
 import { existsSync } from 'fs';
 import { AddonFileTypes } from './AddonFileTypes';
-import { filePathsEqual } from './analysis/FilePathData';
+import { filePathsEqual } from './FilePathData';
 import { ParsedProject } from './analysis/ParsedProject';
 import { Node, ProjectFile } from './domainViewer/createFolderStructure';
 import { getFilesForEntity } from './domainViewer/createFolderStructure';

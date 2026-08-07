@@ -5,11 +5,38 @@ import registerScriptLinkCommands from './scriptLinkActions';
 import { DomainGroupViewer } from './domainViewer/DomainGroupViewer';
 import { ScriptLinkCodeLensProvider } from './codelens/ScriptLinkCodeLensProvider';
 import { registerScriptLinkDiagnostics } from './diagnostics/scriptLinkDiagnostics';
+import { getProjectContext } from './analysis/context';
+import { ProjectParser } from './analysis/ProjectParser';
+import { ParsedProject } from './analysis/ParsedProject';
+import { registerProjectParseDiagnostics } from './diagnostics/projectParseDiagnostics';
+
+
+let parsedProject: ParsedProject
+function getParsedProject() {
+	return parsedProject
+}
+
+function refreshParsedProject() {
+	const projectContext = getProjectContext();
+	if (projectContext === undefined) {
+		throw Error("Project context not found.")
+	}
+	const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectContext;
+
+	const parser = new ProjectParser(
+		resourcePackDir, behaviorPackDir, workspaceRoot
+	)
+	parsedProject = parser.parseAll()
+}
 
 export function activate(context: vscode.ExtensionContext) {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+
+	refreshParsedProject()
+
 	const domainGroupViewer = new DomainGroupViewer(
 		context,
+		() => parsedProject,
 		root,
 	)
 
@@ -20,6 +47,8 @@ export function activate(context: vscode.ExtensionContext) {
 		treeView
 	)
 
+	const refreshProjectParseDiagnostics = registerProjectParseDiagnostics(context)
+
 	// Debounce: the watcher fires per file on bulk operations (builds, git ops),
 	// and a refresh re-runs the full project parse, so batch them.
 	let refreshTimer: NodeJS.Timeout | undefined
@@ -27,7 +56,11 @@ export function activate(context: vscode.ExtensionContext) {
 		if (refreshTimer) {
 			clearTimeout(refreshTimer)
 		}
-		refreshTimer = setTimeout(() => domainGroupViewer.refresh(), 300)
+		refreshTimer = setTimeout(() => {
+			refreshParsedProject()
+			domainGroupViewer.refresh()
+			refreshProjectParseDiagnostics(parsedProject)
+		}, 300)
 	}
 	const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root || '', '**/*'))
 	watcher.onDidCreate(scheduleRefresh)

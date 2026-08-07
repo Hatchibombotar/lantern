@@ -3,7 +3,8 @@ import * as fs from 'fs';
 
 import * as JSONC from "jsonc-parser"
 import { ParsedProject, ScriptLink } from './ParsedProject';
-import { getDetailedPathInfo } from './FilePathData';
+import { FlexibleRecord, FlexibleRecordError } from './FlexibleRecord';
+import { getDetailedPathInfo } from '../FilePathData';
 import { SymbolValue } from './symbols';
 import { parseScriptAnnotations } from './scriptLinks';
 
@@ -12,17 +13,20 @@ export class ProjectParser {
     behaviorPackDir: string
     scanRoot?: string
 
+    errors: FlexibleRecordError[]
+
     constructor(resourcePackDir: string, behaviorPackDir: string, scanRoot?: string) {
         this.resourcePackDir = resourcePackDir
         this.behaviorPackDir = behaviorPackDir
         this.scanRoot = scanRoot
+        this.errors = []
     }
 
     public parseAll() {
         const rpEntities = this.parseRPEntities()
         const bpEntities = this.parseBPEntities()
         const bpItems = this.parseBPItems()
-        
+
         const parsedProject: ParsedProject = {
             resourcePackDir: this.resourcePackDir,
             behaviorPackDir: this.behaviorPackDir,
@@ -38,24 +42,50 @@ export class ProjectParser {
             bp_anims: this.parseBPAnimations(),
             bp_animation_controllers: this.parseBPAnimationControllers(),
             bp_items: bpItems,
-            bp_blocks: this.parseBPBlocks(),
-            script_links: this.parseScriptLinks(rpEntities, bpEntities, bpItems)
+            bp_blocks: this.parseBPBlocks(), // unsafe
+            script_links: this.parseScriptLinks(rpEntities, bpEntities, bpItems),
+            errors: []
         }
 
+        parsedProject.errors = this.errors
+
         return parsedProject
+    }
+
+    private addError(message: string, path: string) {
+        this.errors.push(
+            { message, path }
+        )
+    }
+    private addJSONParseErrors(errors: JSONC.ParseError[], path: string) {
+        for (const e of errors) {
+            this.errors.push({
+                message: "Invalid JSON" + JSONC.printParseErrorCode(e.error) + e.offset,
+                path
+            })
+        }
     }
 
     private parseRPEntities(): ParsedProject["rp_entity"] {
         const rp_entities: ParsedProject["rp_entity"] = {}
         const rp_entity_files = fs.globSync(path.join(this.resourcePackDir, "./entity/**/*.json"))
-        for (const entity_path of rp_entity_files) {
-            const entity_file = fs.readFileSync(entity_path).toString()
-            const rp_entity = JSONC.parse(entity_file)
-            const identifier = rp_entity["minecraft:client_entity"].description.identifier
+        for (const path of rp_entity_files) {
+            const fileString = fs.readFileSync(path).toString()
+            
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(fileString, errors)
+            this.addJSONParseErrors(errors, path)
+
+            const identifier = parsedFile["minecraft:client_entity"]?.description?.identifier
+
+            if (typeof identifier !== "string") {
+                this.addError("Unable to parse identifier", path)
+                continue
+            }
 
             const render_controllers: string[] = []
-            if (rp_entity["minecraft:client_entity"].description.render_controllers) {
-                for (const rc of rp_entity["minecraft:client_entity"].description.render_controllers) {
+            if (parsedFile["minecraft:client_entity"]?.description?.render_controllers) {
+                for (const rc of parsedFile["minecraft:client_entity"].description.render_controllers) {
                     if (typeof rc === "string") {
                         render_controllers.push(rc)
                     } else if (typeof rc === "object") {
@@ -68,19 +98,19 @@ export class ProjectParser {
                 }
             }
 
-            const animations = rp_entity["minecraft:client_entity"].description.animations ? Object.values(rp_entity["minecraft:client_entity"].description.animations) : []
+            const animations = parsedFile["minecraft:client_entity"]?.description?.animations ? Object.values(parsedFile["minecraft:client_entity"]?.description?.animations) : []
 
             // FINISH
             const seperately_referenced_animation_controllers =
-                rp_entity["minecraft:client_entity"].description.animation_controllers ?
-                    rp_entity["minecraft:client_entity"].description.animation_controllers.map((x: { [ac: string]: string }) => Object.values(x)).flat() : []
+                parsedFile["minecraft:client_entity"]?.description?.animation_controllers ?
+                    parsedFile["minecraft:client_entity"]?.description?.animation_controllers.map((x: { [ac: string]: string }) => Object.values(x)).flat() : []
 
 
-            const models = Object.values(rp_entity["minecraft:client_entity"].description.geometry)
-            const textures = Object.values(rp_entity["minecraft:client_entity"].description.textures)
+            const models = Object.values(parsedFile["minecraft:client_entity"]?.description?.geometry ?? {})
+            const textures = Object.values(parsedFile["minecraft:client_entity"]?.description?.textures ?? {})
 
             rp_entities[identifier] = {
-                path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, entity_path),
+                path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
                 animations: animations as string[],
                 seperately_referenced_animation_controllers: seperately_referenced_animation_controllers as string[],
 
@@ -98,13 +128,23 @@ export class ProjectParser {
         const rp_attachables: ParsedProject["rp_attachables"] = {}
         const rp_attachable_files = fs.globSync(path.join(this.resourcePackDir, "./attachables/**/*.json"))
         for (const entity_path of rp_attachable_files) {
-            const entity_file = fs.readFileSync(entity_path).toString()
-            const rp_entity = JSONC.parse(entity_file)
-            const identifier = rp_entity["minecraft:attachable"].description.identifier
+
+            const fileString = fs.readFileSync(entity_path).toString()
+            
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(fileString, errors)
+            this.addJSONParseErrors(errors, entity_path)
+
+            const identifier = parsedFile["minecraft:attachable"].description.identifier
+            
+            if (typeof identifier !== "string") {
+                this.addError("Unable to parse identifier", entity_path)
+                continue
+            }
 
             const render_controllers: string[] = []
-            if (rp_entity["minecraft:attachable"].description.render_controllers) {
-                for (const rc of rp_entity["minecraft:attachable"].description.render_controllers) {
+            if (parsedFile["minecraft:attachable"]?.description?.render_controllers) {
+                for (const rc of parsedFile["minecraft:attachable"].description.render_controllers) {
                     if (typeof rc === "string") {
                         render_controllers.push(rc)
                     } else if (typeof rc === "object") {
@@ -119,7 +159,7 @@ export class ProjectParser {
 
             rp_attachables[identifier] = {
                 path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, entity_path),
-                animations: rp_entity["minecraft:attachable"].description.animations ? Object.values(rp_entity["minecraft:attachable"].description.animations) : [],
+                animations: Object.values(parsedFile["minecraft:attachable"].description.animations ?? {}),
                 render_controllers
             }
         }
@@ -132,7 +172,11 @@ export class ProjectParser {
         const rp_anim_files = fs.globSync(path.join(this.resourcePackDir, "./animations/**/*.json"))
         for (const path of rp_anim_files) {
             const file = fs.readFileSync(path).toString()
+
+            const errors: JSONC.ParseError[] = []
             const animations = JSONC.parse(file)
+            this.addJSONParseErrors(errors, path)
+
             for (const anim in animations.animations) {
                 rp_anims[anim] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
             }
@@ -146,7 +190,11 @@ export class ProjectParser {
         const bp_anim_files = fs.globSync(path.join(this.behaviorPackDir, "./animations/**/*.json"))
         for (const path of bp_anim_files) {
             const file = fs.readFileSync(path).toString()
+
+            const errors: JSONC.ParseError[] = []
             const animations = JSONC.parse(file)
+            this.addJSONParseErrors(errors, path)
+
             for (const anim in animations.animations) {
                 bp_anims[anim] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
             }
@@ -156,57 +204,99 @@ export class ProjectParser {
     }
 
     private parseRPAnimationControllers(): ParsedProject["rp_animation_controllers"] {
-        const rp_animation_controllers: ParsedProject["rp_animation_controllers"] = {}
-        const rp_animation_controller_files = fs.globSync(path.join(this.resourcePackDir, "./animation_controllers/**/*.json"))
-        for (const path of rp_animation_controller_files) {
-            const file = fs.readFileSync(path).toString()
-            const animations = JSONC.parse(file)
-            for (const anim in animations.animation_controllers) {
-                rp_animation_controllers[anim] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
+        const animation_controllers: ParsedProject["rp_animation_controllers"] = {}
+        const files = fs.globSync(path.join(this.resourcePackDir, "./animation_controllers/**/*.json"))
+        for (const path of files) {
+            const fileString = fs.readFileSync(path).toString()
+            
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(fileString, errors)
+            this.addJSONParseErrors(errors, path)
+
+            if (typeof parsedFile.animation_controllers !== "object") {
+                this.addError(
+                    "Unable to parse animation controller", path
+                )
+                continue
+            }
+
+            for (const anim in parsedFile.animation_controllers) {
+                animation_controllers[anim] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
             }
         }
 
-        return rp_animation_controllers
+        return animation_controllers
     }
 
     private parseBPAnimationControllers(): ParsedProject["bp_animation_controllers"] {
-        const bp_animation_controllers: ParsedProject["bp_animation_controllers"] = {}
-        const bp_animation_controller_files = fs.globSync(path.join(this.behaviorPackDir, "./animation_controllers/**/*.json"))
-        for (const path of bp_animation_controller_files) {
-            const file = fs.readFileSync(path).toString()
-            const animations = JSONC.parse(file)
-            for (const anim in animations.animation_controllers) {
-                bp_animation_controllers[anim] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
+        const animation_controllers: ParsedProject["bp_animation_controllers"] = {}
+        const files = fs.globSync(path.join(this.behaviorPackDir, "./animation_controllers/**/*.json"))
+        for (const path of files) {
+            const fileString = fs.readFileSync(path).toString()
+            
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(fileString, errors)
+            this.addJSONParseErrors(errors, path)
+
+            if (typeof parsedFile.animation_controllers !== "object") {
+                this.addError(
+                    "Unable to parse animation controller", path
+                )
+                continue
+            }
+
+            for (const anim in parsedFile.animation_controllers) {
+                animation_controllers[anim] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
             }
         }
 
-        return bp_animation_controllers
+        return animation_controllers
     }
 
     private parseRPRenderControllers(): ParsedProject["rp_render_controllers"] {
-        const rp_render_controllers: ParsedProject["rp_render_controllers"] = {}
-        const rp_rc_files = fs.globSync(path.join(this.resourcePackDir, "./render_controllers/**/*.json"))
-        for (const path of rp_rc_files) {
-            const file = fs.readFileSync(path).toString()
-            const rc = JSONC.parse(file)
+        const render_controllers: ParsedProject["rp_render_controllers"] = {}
+
+        const files = fs.globSync(path.join(this.resourcePackDir, "./render_controllers/**/*.json"))
+        for (const path of files) {
+            const fileString = fs.readFileSync(path).toString()
+
+            const errors: JSONC.ParseError[] = []
+            const rc = JSONC.parse(fileString, errors)
+            this.addJSONParseErrors(errors, path)
+
+            if (typeof rc.render_controllers !== "object") {
+                continue
+            }
+
+            const pathInfo = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
             for (const anim in rc.render_controllers) {
-                rp_render_controllers[anim] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
+                render_controllers[anim] = pathInfo
             }
         }
-        return rp_render_controllers
+
+        return render_controllers
     }
 
     private parseBPEntities(): ParsedProject["bp_entity"] {
         const bp_entities: ParsedProject["bp_entity"] = {}
         const bp_entity_files = fs.globSync(path.join(this.behaviorPackDir, "./entities/**/*.json"))
-        for (const entity_path of bp_entity_files) {
-            const entity_file = fs.readFileSync(entity_path).toString()
-            const entity = JSONC.parse(entity_file)
-            const identifier = entity["minecraft:entity"].description.identifier
+        for (const path of bp_entity_files) {
+            const fileString = fs.readFileSync(path).toString()
+            
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(fileString, errors)
+            this.addJSONParseErrors(errors, path)
+
+            const identifier = parsedFile["minecraft:entity"]?.description?.identifier
+            
+            if (typeof identifier !== "string") {
+                this.addError("Unable to parse identifier", path)
+                continue
+            }
 
             bp_entities[identifier] = {
-                path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, entity_path),
-                animations: entity["minecraft:entity"].description.animations ? Object.values(entity["minecraft:entity"].description.animations) : [],
+                path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
+                animations: Object.values(parsedFile["minecraft:entity"]?.description?.animations ?? {}),
             }
         }
         return bp_entities
@@ -217,12 +307,20 @@ export class ProjectParser {
         const bp_items: ParsedProject["bp_items"] = {}
         const bp_item_files = fs.globSync(path.join(this.behaviorPackDir, "./items/**/*.json"))
         for (const path of bp_item_files) {
-            const file = fs.readFileSync(path).toString()
-            const item = JSONC.parse(file)
-            const identifier = item["minecraft:item"].description.identifier
+            const fileString = fs.readFileSync(path).toString()
 
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(fileString, errors)
+            this.addJSONParseErrors(errors, path)
 
-            const iconComponents = getAllInstancesOfComponentInJSON(item, "minecraft:item", "minecraft:icon")
+            const identifier = parsedFile["minecraft:item"]?.description?.identifier
+            
+            if (typeof identifier !== "string") {
+                this.addError("Unable to parse identifier", path)
+                continue
+            }
+
+            const iconComponents = getAllInstancesOfComponentInJSON(parsedFile, "minecraft:item", "minecraft:icon")
             const textureShortnames: SymbolValue[] = []
             for (const component of iconComponents) {
                 if (typeof component === "string") {
@@ -250,8 +348,10 @@ export class ProjectParser {
                                 return x.path
                             }
                         }))
-                    } else {
+                    } else if (typeof textureData === "string") {
                         textures.push(textureData)
+                    } else {
+                        this.addError("Unexpected item_texture.json texture data type", path)
                     }
                 }
             }
@@ -271,8 +371,19 @@ export class ProjectParser {
         const culling_rule_files = fs.globSync(path.join(this.resourcePackDir, "./block_culling/**/*.json"))
         for (const path of culling_rule_files) {
             const file = fs.readFileSync(path).toString()
-            const item = JSONC.parse(file)
-            const identifier = item["minecraft:block_culling_rules"].description.identifier
+
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(file)
+            this.addJSONParseErrors(errors, path)
+
+            const identifier = parsedFile["minecraft:block_culling_rules"]?.description?.identifier
+
+            if (typeof identifier !== "string") {
+                this.addError(
+                    "Unable to parse identifier", path
+                )
+                continue
+            }
 
             rp_block_culling_rules[identifier] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
         }
@@ -284,14 +395,25 @@ export class ProjectParser {
         const blocksJsonData = this.parseBlocksJsonData()
         const terrainTextureData = this.parseTerrainTextureData()
 
-        const bp_blocks: ParsedProject["bp_blocks"] = {}
+        const bp_blocks: ParsedProject["bp_blocks"] = new FlexibleRecord()
         const bp_block_files = fs.globSync(path.join(this.behaviorPackDir, "./blocks/**/*.json"))
         for (const path of bp_block_files) {
             const file = fs.readFileSync(path).toString()
-            const item = JSONC.parse(file)
-            const identifier = item["minecraft:block"].description.identifier
 
-            const geometryComponents = getAllInstancesOfComponentInJSON(item, "minecraft:block", "minecraft:geometry")
+            const errors: JSONC.ParseError[] = []
+            const parsedFile = JSONC.parse(file)
+            this.addJSONParseErrors(errors, path)
+
+            const identifier: unknown = parsedFile["minecraft:block"]?.description?.identifier
+
+            if (typeof identifier !== "string") {
+                this.errors.push(
+                    { message: "Identifier invalid or not found in block.", path }
+                )
+                continue
+            }
+
+            const geometryComponents = getAllInstancesOfComponentInJSON(parsedFile, "minecraft:block", "minecraft:geometry")
 
             const cullingIdentifiers: SymbolValue[] = []
             const models: SymbolValue[] = []
@@ -299,12 +421,12 @@ export class ProjectParser {
                 if (!models.includes(geo.identifier)) {
                     models.push(geo.identifier)
                 }
-                if (geo.culling && !cullingIdentifiers.includes(geo.culling)) {
+                if (geo?.culling && !cullingIdentifiers.includes(geo.culling)) {
                     cullingIdentifiers.push(geo.culling)
                 }
             }
 
-            const materialInstanceComponents = getAllInstancesOfComponentInJSON(item, "minecraft:block", "minecraft:material_instances")
+            const materialInstanceComponents = getAllInstancesOfComponentInJSON(parsedFile, "minecraft:block", "minecraft:material_instances")
             const textureShortnames: SymbolValue[] = []
             for (const component of materialInstanceComponents) {
                 for (const faceMaterial of Object.values<any>(component)) {
@@ -319,7 +441,7 @@ export class ProjectParser {
                 if (typeof blocksJsonData[identifier].textures === "string") {
                     textureShortnames.push(blocksJsonData[identifier].textures)
                 } else if (typeof blocksJsonData[identifier] === "object") {
-                    textureShortnames.push(...Object.values(blocksJsonData[identifier].textures) as any)
+                    textureShortnames.push(...Object.values(blocksJsonData[identifier]?.textures ?? {}) as any)
                 }
             }
 
@@ -335,19 +457,21 @@ export class ProjectParser {
                                 return x.path
                             }
                         }))
-                    } else {
+                    } else if (typeof textureData === "string") {
                         textures.push(textureData)
+                    } else {
+                        this.addError("Unexpected terrain_texture.json texture data type", path)
                     }
                 }
             }
 
-            bp_blocks[identifier] = {
+            bp_blocks.addValue(identifier, {
                 path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
                 cullingRules: cullingIdentifiers,
                 models,
                 textureShortnames,
                 textures,
-            }
+            })
         }
 
         return bp_blocks
@@ -358,10 +482,26 @@ export class ProjectParser {
         const rp_model_files = fs.globSync(path.join(this.resourcePackDir, "./models/**/*.json"))
         for (const path of rp_model_files) {
             const file = fs.readFileSync(path).toString()
+
+            const errors: JSONC.ParseError[] = []
             const parsedFile = JSONC.parse(file)
+            this.addJSONParseErrors(errors, path)
+
+            if (typeof parsedFile["minecraft:geometry"] !== "object") {
+                this.addError(
+                    "Unable to parse geometry file", path
+                )
+                continue
+            }
 
             for (const model of parsedFile["minecraft:geometry"]) {
-                const identifier = model.description.identifier
+                const identifier = model?.description?.identifier
+                if (typeof identifier !== "string") {
+                    this.addError(
+                        "Unable to parse identifier in geometry file. Expected: string", path
+                    )
+                    continue
+                }
 
                 rp_models[identifier] = getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path)
             }
@@ -371,9 +511,9 @@ export class ProjectParser {
     }
 
     private parseRPTextures(): ParsedProject["rp_textures"] {
-        const rp_texture_dir_files = fs.globSync(path.join(this.resourcePackDir, "./textures/**/*.{json,tga,png,jpg,jpeg}"))
+        const files = fs.globSync(path.join(this.resourcePackDir, "./textures/**/*.{json,tga,png,jpg,jpeg}"))
         const rp_textures: ParsedProject["rp_textures"] = {}
-        for (const file of rp_texture_dir_files) {
+        for (const file of files) {
             const parsedPath = path.parse(file)
 
             const inGameTexturePath = path.relative(
@@ -437,7 +577,7 @@ export class ProjectParser {
         return terrainTextureData
     }
 
-    private parseScriptLinks(rp_entities: ParsedProject["rp_entity"], bp_entities: ParsedProject["bp_entity"], bp_items: ParsedProject["bp_items"] ) {
+    private parseScriptLinks(rp_entities: ParsedProject["rp_entity"], bp_entities: ParsedProject["bp_entity"], bp_items: ParsedProject["bp_items"]) {
         const script_links: ScriptLink[] = []
         if (this.scanRoot && fs.existsSync(this.scanRoot)) {
             // Identifiers we can legitimately link to, by category. Matching against

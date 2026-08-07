@@ -4,7 +4,7 @@ import * as nodePath from 'path';
 import * as JSONC from "jsonc-parser"
 
 import { AddonFileTypes } from './AddonFileTypes';
-import { getProjectData } from './analysis/projectData';
+import { getProjectContext } from './analysis/context';
 import { findOrCreateDestinationPath, getFilesOfType, jsoncModifyandEditWithInitialisedParents as jsoncModify, objectModifyWithInitialisedParents, readTemplate } from './utils';
 import { Node, NodeInfo } from './domainViewer/createFolderStructure';
 
@@ -56,7 +56,7 @@ function createEntity(context: vscode.ExtensionContext) {
             placeHolder: 'Entity Type',
         });
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, behaviorPackDir, defaultFormatVersion } = projectData
 
@@ -111,7 +111,7 @@ function createItem(context: vscode.ExtensionContext) {
 
         const entityName = identifier.trim().split(":")[1]
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { behaviorPackDir, defaultFormatVersion } = projectData
 
@@ -149,7 +149,7 @@ function entityCreateBPEntity(context: vscode.ExtensionContext) {
         const folderPath = "." + meta.path
         const [_, entityName] = meta.identifier.trim().split(":")
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { behaviorPackDir, defaultFormatVersion } = projectData
 
@@ -177,7 +177,7 @@ function entityCreateBPAnimation(context: vscode.ExtensionContext) {
             return vscode.window.showInformationMessage(`BP entity does not exist for entity ${meta.identifier}`)
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { behaviorPackDir, defaultFormatVersion } = projectData
 
@@ -308,7 +308,7 @@ function entityCreateBPAnimationController(context: vscode.ExtensionContext) {
             return
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { behaviorPackDir, defaultFormatVersion } = projectData
 
@@ -437,7 +437,7 @@ function entityCreateRPEntity(context: vscode.ExtensionContext) {
         const folderPath = "." + meta.path
         const [_namespace, entityName] = meta.identifier.trim().split(":")
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 
@@ -467,7 +467,7 @@ function entityCreateRPAnimation(context: vscode.ExtensionContext) {
             return
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 
@@ -596,7 +596,7 @@ function entityCreateRPAnimationController(context: vscode.ExtensionContext) {
             return
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 
@@ -725,7 +725,7 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
             return
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 
@@ -835,7 +835,7 @@ function itemCreateBPItem(context: vscode.ExtensionContext) {
         const folderPath = "." + meta.path
         const [_, entityName] = meta.identifier.trim().split(":")
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { behaviorPackDir, defaultFormatVersion } = projectData
 
@@ -864,7 +864,7 @@ function itemAttachableCreateRPEntity(context: vscode.ExtensionContext) {
         const folderPath = "." + meta.path
         const entityName = meta.identifier.trim().split(":")[1]
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 
@@ -894,7 +894,7 @@ function itemAttachableCreateRPAnimation(context: vscode.ExtensionContext) {
             return
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 
@@ -1023,7 +1023,7 @@ function itemAttachableCreateRPAnimationController(context: vscode.ExtensionCont
             return
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 
@@ -1152,7 +1152,7 @@ function itemAttachableCreateRPRenderController(context: vscode.ExtensionContext
             return
         }
 
-        const projectData = getProjectData()
+        const projectData = getProjectContext()
         if (projectData === undefined) return
         const { resourcePackDir, defaultFormatVersion } = projectData
 

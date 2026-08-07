@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ParsedProject } from './analysis/ParsedProject';
-import { getProjectData } from './analysis/projectData';
+import { getProjectContext } from './analysis/context';
 import { DomainGroupViewer } from './domainViewer/DomainGroupViewer';
 import { Category } from './domainViewer/createFolderStructure';
 import { ProjectParser } from './analysis/ProjectParser';
@@ -13,11 +13,11 @@ export default function registerScriptLinkCommands(context: vscode.ExtensionCont
 }
 
 function getParsedProject(): ParsedProject | undefined {
-	const projectData = getProjectData();
-	if (projectData === undefined) {
+	const projectContext = getProjectContext();
+	if (projectContext === undefined) {
 		return undefined;
 	}
-	const parser = new ProjectParser(projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot)
+	const parser = new ProjectParser(projectContext.resourcePackDir, projectContext.behaviorPackDir, projectContext.workspaceRoot)
 	const parsedProject = parser.parseAll()
 	return parsedProject || undefined;
 }

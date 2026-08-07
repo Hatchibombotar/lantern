@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseScriptAnnotations } from '../analysis/scriptLinks';
-import { getProjectData } from '../analysis/projectData';
+import { getProjectContext } from '../analysis/context';
 import { ProjectParser } from '../analysis/ProjectParser';
 
 // Warns about `@lantern` annotations that reference unknown identifiers (typos /
@@ -53,12 +53,12 @@ function getKnownIdentifiers(): KnownIdentifiers | undefined {
 	if (!hasConfig()) {
 		return undefined;
 	}
-	const projectData = getProjectData();
-	if (projectData === undefined) {
+	const projectContext = getProjectContext();
+	if (projectContext === undefined) {
 		return undefined;
 	}
 	const parser = new ProjectParser(
-		projectData.resourcePackDir, projectData.behaviorPackDir, projectData.workspaceRoot
+		projectContext.resourcePackDir, projectContext.behaviorPackDir, projectContext.workspaceRoot
 	)
 	const parsedProject = parser.parseAll()
 	if (parsedProject === undefined) {

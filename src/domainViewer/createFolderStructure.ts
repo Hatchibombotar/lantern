@@ -4,8 +4,7 @@ import * as fs from 'fs';
 export type ProjectFile = { fileType: AddonFileTypes; path: FilePathData; };
 
 import { AddonFileTypes } from '../AddonFileTypes';
-import { getDetailedPathInfo } from '../analysis/FilePathData';
-import { FilePathData } from '../analysis/FilePathData';
+import { FilePathData } from '../FilePathData';
 import { ParsedProject, ScriptLink } from '../analysis/ParsedProject';
 
 export type Category = "entities" | "items" | "blocks"
@@ -33,12 +32,10 @@ export type NodeInfo = {
 	scriptLinks: ScriptLink[],
 	category: Category
 }
-
 export type FileFolder = {
 	type: "fileFolder",
 	files: ProjectFile[],
 }
-
 export function parseEntitiesInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
 		type: "folder",
@@ -177,7 +174,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 			category: "items",
 			path: folderPath,
 		}
-		
+
 		folder.children.push(entityInfo)
 	}
 
@@ -213,26 +210,26 @@ export function parseBlocksInFolder(folderPath: string, projectData: ParsedProje
 
 	const BPBlockFiles = fs.globSync(path.join(BPPath, "/*.json"))
 	for (const BPBlockFile of BPBlockFiles) {
-		const [identifier, bp_block] = Object.entries(projectData.bp_blocks).find(([_, block]) => block.path.exactPath === BPBlockFile) ?? []
+		const bp_blocks = projectData.bp_blocks.find(([k, v]) => {
+			return BPBlockFile === v.path.exactPath
+		})
 
-		if (identifier === undefined || bp_block === undefined) {
-			continue
+		for (const [identifier, bp_block] of bp_blocks) {
+			const files = getFilesForBlock(projectData, bp_block)
+			const assets = getAssetsForBlock(projectData, bp_block)
+
+			const entityInfo: NodeInfo = {
+				type: "element",
+				identifier: identifier,
+				files,
+				assets,
+				scriptLinks: getScriptsForIdentifier(projectData, identifier, "blocks"),
+				category: "blocks",
+				path: folderPath,
+			}
+
+			folder.children.push(entityInfo)
 		}
-
-		const files = getFilesForBlock(projectData, identifier)
-		const assets = getAssetsForBlock(projectData, identifier)
-
-		const entityInfo: NodeInfo = {
-			type: "element",
-			identifier: identifier,
-			files,
-			assets,
-			scriptLinks: getScriptsForIdentifier(projectData, identifier, "blocks"),
-			category: "blocks",
-			path: folderPath,
-		}
-
-		folder.children.push(entityInfo)
 	}
 
 	if (!isRoot && folder.children.length === 1 && isFolder(folder.children[0])) {
@@ -423,8 +420,7 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 
 	return projectFiles;
 }
-export function getFilesForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
-	const block = parsedProject.bp_blocks[identifier]
+export function getFilesForBlock(parsedProject: ParsedProject, block: ParsedProject.BPBlock): ProjectFile[] {
 	const files: ProjectFile[] = []
 	if (block) {
 		files.push(
@@ -436,7 +432,7 @@ export function getFilesForBlock(parsedProject: ParsedProject, identifier: strin
 		const cullingRule = parsedProject.rp_block_culling_rules[rule]
 		if (cullingRule) {
 			files.push(
-				{ fileType: AddonFileTypes.rp_block_culling_rule, path: cullingRule}
+				{ fileType: AddonFileTypes.rp_block_culling_rule, path: cullingRule }
 			)
 		}
 	}
@@ -480,13 +476,7 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 	return files
 }
 
-export function getAssetsForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
-	const bp_block = parsedProject.bp_blocks[identifier];
-
-	if (bp_block === undefined) {
-		return []
-	}
-
+export function getAssetsForBlock(parsedProject: ParsedProject, bp_block: ParsedProject.BPBlock): ProjectFile[] {
 	const files: ProjectFile[] = []
 
 	for (const modelIdentifier of bp_block.models) {

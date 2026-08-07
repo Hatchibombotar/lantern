@@ -1,4 +1,5 @@
-import { FilePathData } from './FilePathData';
+import { FilePathData } from '../FilePathData';
+import { FlexibleRecord, FlexibleRecordError } from './FlexibleRecord';
 import { ScriptAnnotation } from './scriptLinks';
 import { SymbolValue } from './symbols';
 
@@ -26,7 +27,7 @@ export type ParsedProject = {
 		animations: string[];
 		render_controllers: string[];
 	}>;
-	"rp_anims": Record<SymbolValue, FilePathData>;
+	"rp_anims": Record<SymbolValue, ParsedProject.Animation>;
 	"rp_animation_controllers": Record<SymbolValue, FilePathData>;
 	"rp_render_controllers": Record<SymbolValue, FilePathData>;
 
@@ -45,7 +46,7 @@ export type ParsedProject = {
 		path: FilePathData;
 		animations: string[];
 	}>;
-	"bp_anims": Record<SymbolValue, FilePathData>;
+	"bp_anims": Record<SymbolValue, ParsedProject.Animation>;
 	"bp_animation_controllers": Record<SymbolValue, FilePathData>;
 
 
@@ -56,17 +57,25 @@ export type ParsedProject = {
 		textures: string[];
 	}>;
 
-	"bp_blocks": Record<SymbolValue, {
+	"bp_blocks": FlexibleRecord<SymbolValue, ParsedProject.BPBlock>;
+
+	"script_links": ScriptLink[];
+
+	errors: FlexibleRecordError[]
+};
+
+export namespace ParsedProject {
+	export type BPBlock = {
 		path: FilePathData;
 		cullingRules: string[];
 		models: SymbolValue[];
 
 		textureShortnames: SymbolValue[];
 		textures: string[];
-	}>;
+	}
 
-	"script_links": ScriptLink[];
-};
+	export type Animation = FilePathData
+}
 
 export type ScriptLink = ScriptAnnotation & {
 	scriptPath: string,

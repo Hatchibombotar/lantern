@@ -3,7 +3,7 @@ import * as JSONC from 'jsonc-parser';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-export type ProjectData = {
+export type ProjectContext = {
 	resourcePackDir: string,
 	behaviorPackDir: string,
 	workspaceRoot: string,   // scanned for @lantern script annotations
@@ -11,7 +11,7 @@ export type ProjectData = {
 	defaultFormatVersion: string
 }
 
-export function getProjectData(): ProjectData | undefined {
+export function getProjectContext(): ProjectContext | undefined {
 	const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	if (rootPath === undefined) {
 		return;

@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { file_type_names, AddonFileTypes } from '../AddonFileTypes';
-import { getProjectData } from '../analysis/projectData';
+import { getProjectContext } from '../analysis/context';
 import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder, ProjectFile, FileFolder } from './createFolderStructure';
 import path from 'path';
-import { ScriptLink } from '../analysis/ParsedProject';
+import { ParsedProject, ScriptLink } from '../analysis/ParsedProject';
 import { ProjectParser } from '../analysis/ProjectParser';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -12,8 +12,11 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 	context: vscode.ExtensionContext;
 
-	constructor(context: vscode.ExtensionContext, private workspaceRoot?: string) {
+	getParsedProject: () => ParsedProject
+
+	constructor(context: vscode.ExtensionContext, getParsedProject: () => ParsedProject, private workspaceRoot?: string) {
 		this.context = context;
+		this.getParsedProject = getParsedProject
 	}
 
 	refresh(node?: vscode.TreeItem) {
@@ -29,8 +32,8 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			return [];
 		}
 
-		const projectData = getProjectData();
-		if (projectData === undefined) {
+		const projectContext = getProjectContext();
+		if (projectContext === undefined) {
 			console.log("err");
 			return [];
 		}
@@ -48,16 +51,13 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				return this.expandFileFolder(parent, meta);
 			} else if (meta.type === "root") {
 				// TODO: do this globally; This is currenly parsing the project three times per refresh
-				const projectData = getProjectData();
-				if (projectData === undefined) {
+				const projectContext = getProjectContext();
+				if (projectContext === undefined) {
 					return [];
 				}
-				const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
+				const { resourcePackDir, behaviorPackDir } = projectContext;
 
-				const parser = new ProjectParser(
-					resourcePackDir, behaviorPackDir, workspaceRoot
-				)
-				const parsedProject = parser.parseAll()
+				const parsedProject = this.getParsedProject()
 
 				if (meta.rootType === "entities") {
 					const entities = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
@@ -277,41 +277,38 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 	private folderChildrenToTreeItems(parent: vscode.TreeItem, folder: Folder, isRoot = false): vscode.TreeItem[] {
 		return folder.children.map(child => {
-			if (isFolder(child)) {
-				const item = new vscode.TreeItem(child.name, vscode.TreeItemCollapsibleState.Collapsed);
-				if (isRoot && folder.children.length === 1) {
-					item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+			switch (child.type) {
+				case "folder": {
+					const item = new vscode.TreeItem(child.name, vscode.TreeItemCollapsibleState.Collapsed);
+					if (isRoot && folder.children.length === 1) {
+						item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+					}
+					item.iconPath = vscode.ThemeIcon.Folder;
+					(item as any).__meta = child;
+					item.contextValue = 'folder_' + child.category;
+					(item as any).__parent = parent;
+					return item;
 				}
-				item.iconPath = vscode.ThemeIcon.Folder;
-				(item as any).__meta = child;
-				item.contextValue = 'folder_' + child.category;
-				(item as any).__parent = parent;
-				return item;
-			} else {
-				const item = new vscode.TreeItem(child.identifier, vscode.TreeItemCollapsibleState.Collapsed);
-				if (child.files[0]) {
-					// item.resourceUri = vscode.Uri.file(child.files[0].path.exactPath);
+				case "element": {
+					const item = new vscode.TreeItem(child.identifier, vscode.TreeItemCollapsibleState.Collapsed);
+
+					item.iconPath = {
+						dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "product/file_coloured.svg"),
+						light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "product/file_coloured.svg"),
+					};
+					item.label = {
+						label: child.identifier,
+					};
+
+					item.contextValue = 'node_' + child.category;
+					item.tooltip = child.identifier;
+					(item as any).__parent = parent;
+
+					(item as any).__meta = child;
+					return item;
 				}
-
-				item.iconPath = new vscode.ThemeIcon('file', new vscode.ThemeColor('bedrockLantern.genericFile'));
-
-				item.iconPath = {
-					dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "product/file_coloured.svg"),
-					light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "product/file_coloured.svg"),
-				};
-				// item.iconPath = vscode.ThemeIcon.File;
-				item.label = {
-					label: child.identifier,
-				};
-
-				item.contextValue = 'node_' + child.category;
-				item.tooltip = child.identifier;
-				(item as any).__parent = parent;
-
-				(item as any).__meta = child;
-				return item;
 			}
-		});
+		})
 	}
 
 	public getParent(node?: vscode.TreeItem): (vscode.TreeItem | null) {
@@ -325,14 +322,13 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 	}
 
 	public openNode(root: Category, identifier: string, treeView: vscode.TreeView<vscode.TreeItem>) {
-		const projectData = getProjectData();
-		if (projectData === undefined) {
+		const projectContext = getProjectContext();
+		if (projectContext === undefined) {
 			return;
 		}
-		const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectData;
-
-		const parser = new ProjectParser(resourcePackDir, behaviorPackDir, workspaceRoot)
-		const parsedProject = parser.parseAll()
+		const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectContext;
+		const parsedProject = this.getParsedProject()
+		
 		if (parsedProject === void 0) {
 			vscode.window.showErrorMessage("Unexpected Error");
 			return;
