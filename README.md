@@ -5,7 +5,7 @@ A proper IDE experience for Bedrock Add-Ons. Create add-ons efficiently by cutti
 ### Grouped Files
 This extension adds a new view within the explorer which groups Minecraft Bedrock Add-On Files by identifier.
 
-It currently groups files linked to entities and items.
+It currently groups files linked to entities, items, and blocks.
 
 In the below picture, it shows all files linked to the chicken in the vanilla packs. The group view is in the secondary sidebar. 
 
@@ -24,7 +24,7 @@ You can also run this using the command pallete under the command `Lantern: Impo
 
 This will download everything that links to the entity e.g. animations, render controllers
 
-### Linking scripts to entities/items
+### Linking scripts
 
 Scripts aren't tied to a single identifier, so you link them explicitly with a `@lantern-links-*` comment placed directly above the code it relates to:
 
