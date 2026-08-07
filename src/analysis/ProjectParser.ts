@@ -26,6 +26,7 @@ export class ProjectParser {
         const rpEntities = this.parseRPEntities()
         const bpEntities = this.parseBPEntities()
         const bpItems = this.parseBPItems()
+        const bpBlocks = this.parseBPBlocks()
 
         const parsedProject: ParsedProject = {
             resourcePackDir: this.resourcePackDir,
@@ -42,8 +43,8 @@ export class ProjectParser {
             bp_anims: this.parseBPAnimations(),
             bp_animation_controllers: this.parseBPAnimationControllers(),
             bp_items: bpItems,
-            bp_blocks: this.parseBPBlocks(), // unsafe
-            script_links: this.parseScriptLinks(rpEntities, bpEntities, bpItems),
+            bp_blocks: bpBlocks,
+            script_links: this.parseScriptLinks(rpEntities, bpEntities, bpItems, bpBlocks),
             errors: []
         }
 
@@ -71,7 +72,7 @@ export class ProjectParser {
         const rp_entity_files = fs.globSync(path.join(this.resourcePackDir, "./entity/**/*.json"))
         for (const path of rp_entity_files) {
             const fileString = fs.readFileSync(path).toString()
-            
+
             const errors: JSONC.ParseError[] = []
             const parsedFile = JSONC.parse(fileString, errors)
             this.addJSONParseErrors(errors, path)
@@ -130,13 +131,13 @@ export class ProjectParser {
         for (const entity_path of rp_attachable_files) {
 
             const fileString = fs.readFileSync(entity_path).toString()
-            
+
             const errors: JSONC.ParseError[] = []
             const parsedFile = JSONC.parse(fileString, errors)
             this.addJSONParseErrors(errors, entity_path)
 
             const identifier = parsedFile["minecraft:attachable"].description.identifier
-            
+
             if (typeof identifier !== "string") {
                 this.addError("Unable to parse identifier", entity_path)
                 continue
@@ -208,7 +209,7 @@ export class ProjectParser {
         const files = fs.globSync(path.join(this.resourcePackDir, "./animation_controllers/**/*.json"))
         for (const path of files) {
             const fileString = fs.readFileSync(path).toString()
-            
+
             const errors: JSONC.ParseError[] = []
             const parsedFile = JSONC.parse(fileString, errors)
             this.addJSONParseErrors(errors, path)
@@ -233,7 +234,7 @@ export class ProjectParser {
         const files = fs.globSync(path.join(this.behaviorPackDir, "./animation_controllers/**/*.json"))
         for (const path of files) {
             const fileString = fs.readFileSync(path).toString()
-            
+
             const errors: JSONC.ParseError[] = []
             const parsedFile = JSONC.parse(fileString, errors)
             this.addJSONParseErrors(errors, path)
@@ -282,13 +283,13 @@ export class ProjectParser {
         const bp_entity_files = fs.globSync(path.join(this.behaviorPackDir, "./entities/**/*.json"))
         for (const path of bp_entity_files) {
             const fileString = fs.readFileSync(path).toString()
-            
+
             const errors: JSONC.ParseError[] = []
             const parsedFile = JSONC.parse(fileString, errors)
             this.addJSONParseErrors(errors, path)
 
             const identifier = parsedFile["minecraft:entity"]?.description?.identifier
-            
+
             if (typeof identifier !== "string") {
                 this.addError("Unable to parse identifier", path)
                 continue
@@ -314,7 +315,7 @@ export class ProjectParser {
             this.addJSONParseErrors(errors, path)
 
             const identifier = parsedFile["minecraft:item"]?.description?.identifier
-            
+
             if (typeof identifier !== "string") {
                 this.addError("Unable to parse identifier", path)
                 continue
@@ -577,13 +578,14 @@ export class ProjectParser {
         return terrainTextureData
     }
 
-    private parseScriptLinks(rp_entities: ParsedProject["rp_entity"], bp_entities: ParsedProject["bp_entity"], bp_items: ParsedProject["bp_items"]) {
+    private parseScriptLinks(rp_entities: ParsedProject["rp_entity"], bp_entities: ParsedProject["bp_entity"], bp_items: ParsedProject["bp_items"], bp_blocks: ParsedProject["bp_blocks"]) {
         const script_links: ScriptLink[] = []
         if (this.scanRoot && fs.existsSync(this.scanRoot)) {
             // Identifiers we can legitimately link to, by category. Matching against
             // these lets us drop typos / renamed ids (surfaced as diagnostics).
             const knownEntities = new Set<string>([...Object.keys(rp_entities), ...Object.keys(bp_entities)])
             const knownItems = new Set<string>(Object.keys(bp_items))
+            const knownBlocks = new Set<string>(bp_blocks.keys())
 
             for (const scriptFile of findScriptFiles(this.scanRoot)) {
                 const content = fs.readFileSync(scriptFile).toString()
@@ -593,7 +595,18 @@ export class ProjectParser {
                 }
                 const relativePath = path.relative(this.scanRoot, scriptFile)
                 for (const annotation of annotations) {
-                    const known = annotation.category === "entities" ? knownEntities : knownItems
+                    let known: Set<string>
+                    switch (annotation.category) {
+                        case "blocks":
+                            known = knownBlocks
+                            break
+                        case "entities":
+                            known = knownEntities
+                            break
+                        case "items":
+                            known = knownItems
+                            break
+                    }
                     if (!known.has(annotation.identifier)) {
                         continue
                     }

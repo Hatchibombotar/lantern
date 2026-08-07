@@ -58,7 +58,8 @@
       "lantern": [
         {
           "id": "bedrockLantern",
-          "name": "Grouped Files"
+          "name": "Grouped Files",
+          "icon": "icons/product/activity_bar.svg"
         }
       ]
     },
@@ -159,12 +160,12 @@
 
       {
         "command": "bedrockLantern.linkScript",
-        "title": "Link to Entity/Item",
+        "title": "Link to Entity/Item/Block",
         "category": "Lantern"
       },
       {
         "command": "bedrockLantern.openLinkedIdentifier",
-        "title": "Open Linked Entity/Item",
+        "title": "Open Linked Entity/Item/Block",
         "category": "Lantern"
       }
     ],

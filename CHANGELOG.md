@@ -4,8 +4,10 @@ All notable changes to the extension will be documented in this file.
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 ## [0.5.0]
-- Hardcoded icons for files, stopping coloured icons from turning white
-- Added asset folders
+- Added support for blocks in the sidebar! This includes cullingRules, textures, and models!
+- Added an assets folders to entities and items. This means your textures and models are easily accessible!
+- Hardcoded icons for files, stopping coloured icons from turning white when selected
+- The script link `Link to Entity/Item/Block` now allows for items & entities with the same identifier
 
 ## [0.4.0], [0.4.1]
 - Added script linking to the lantern sidebar, [with contributions from Keyyard](https://github.com/Hatchibombotar/lantern/pull/1).

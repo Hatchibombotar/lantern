@@ -47,7 +47,7 @@ function hasConfig(): boolean {
 	return fs.existsSync(path.join(root, "config.json"));
 }
 
-type KnownIdentifiers = { entities: Set<string>, items: Set<string> };
+type KnownIdentifiers = { entities: Set<string>, items: Set<string>, blocks: Set<string> };
 
 function getKnownIdentifiers(): KnownIdentifiers | undefined {
 	if (!hasConfig()) {
@@ -67,6 +67,7 @@ function getKnownIdentifiers(): KnownIdentifiers | undefined {
 	return {
 		entities: new Set<string>([...Object.keys(parsedProject.bp_entity), ...Object.keys(parsedProject.rp_entity)]),
 		items: new Set<string>(Object.keys(parsedProject.bp_items)),
+		blocks: new Set<string>(parsedProject.bp_blocks.keys()),
 	};
 }
 
@@ -79,11 +80,25 @@ function refresh(document: vscode.TextDocument, collection: vscode.DiagnosticCol
 
 	const diagnostics: vscode.Diagnostic[] = [];
 	for (const annotation of parseScriptAnnotations(document.getText())) {
-		const set = annotation.category === "entities" ? known.entities : known.items;
+		let set: Set<string>
+		let singular: string
+		switch (annotation.category) {
+			case "blocks":
+				set = known.blocks
+				singular = "block"
+				break
+			case "entities":
+				set = known.entities
+				singular = "entity"
+				break
+			case "items":
+				set = known.items
+				singular = "item"
+				break
+		}
 		if (set.has(annotation.identifier)) {
 			continue;
 		}
-		const singular = annotation.category === "entities" ? "entity" : "item";
 		const line = document.lineAt(annotation.line);
 		const index = line.text.indexOf(annotation.identifier);
 		const range = index >= 0

@@ -328,55 +328,44 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		}
 		const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectContext;
 		const parsedProject = this.getParsedProject()
-		
+
 		if (parsedProject === void 0) {
 			vscode.window.showErrorMessage("Unexpected Error");
 			return;
 		}
 
-		if (root === "entities") {
-			const entities = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
-			if (entities === undefined) {
-				return;
-			}
-			const route = findIdentifierInFolder(entities, identifier)
-			let currentTail = this.getChildren()[0]
-			for (const i of route) {
-				treeView.reveal(currentTail, {
-					expand: true
-				})
-				const children = this.getChildren(currentTail)
-				if (children.length === 0) {
-					break
-				} else {
-					currentTail = children[i]
-				}
-			}
-		} else if (root === "items") {
-			const items = parseItemsInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
-			if (items === undefined) {
-				return;
-			}
-
-			// return this.folderChildrenToTreeItems(parent, items, true);
-			const route = findIdentifierInFolder(items, identifier)
-			route.pop()
-			let currentTail = this.getChildren()[1]
-			for (const i of route) {
-				treeView.reveal(currentTail, {
-					expand: true
-				})
-				const children = this.getChildren(currentTail)
-				if (children.length === 0) {
-					break
-				} else {
-					currentTail = children[i]
-				}
-			}
+		let folderStructure: Folder
+		let currentTail: vscode.TreeItem
+		switch (root) {
+			case 'entities':
+				folderStructure = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
+				currentTail = this.getChildren()[0]
+				break
+			case 'items':
+				folderStructure = parseItemsInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
+				currentTail = this.getChildren()[1]
+				break
+			case 'blocks':
+				folderStructure = parseBlocksInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
+				currentTail = this.getChildren()[2]
+				break
+		}
+		const route = findIdentifierInFolder(folderStructure, identifier)
+		route.pop()
+		for (const i of route) {
 			treeView.reveal(currentTail, {
 				expand: true
 			})
+			const children = this.getChildren(currentTail)
+			if (children.length === 0) {
+				break
+			} else {
+				currentTail = children[i]
+			}
 		}
+		treeView.reveal(currentTail, {
+			expand: true
+		})
 	}
 }
 

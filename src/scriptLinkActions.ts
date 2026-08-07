@@ -27,10 +27,10 @@ function knownIdentifierPicks(parsedProject: ParsedProject): vscode.QuickPickIte
 	const picks: vscode.QuickPickItem[] = [];
 	const seen = new Set<string>();
 	const add = (id: string, category: string) => {
-		if (seen.has(id)) {
+		if (seen.has(id+category)) {
 			return;
 		}
-		seen.add(id);
+		seen.add(id+category);
 		picks.push({ label: id, description: category });
 	};
 	for (const id of Object.keys(parsedProject.bp_entity)) {
@@ -41,6 +41,9 @@ function knownIdentifierPicks(parsedProject: ParsedProject): vscode.QuickPickIte
 	}
 	for (const id of Object.keys(parsedProject.bp_items)) {
 		add(id, "item");
+	}
+	for (const id of parsedProject.bp_blocks.keys()) {
+		add(id, "block");
 	}
 	picks.sort((a, b) => a.label.localeCompare(b.label));
 	return picks;
@@ -75,7 +78,7 @@ function linkScript() {
 
 		const chosen = await vscode.window.showQuickPick(picks, {
 			canPickMany: true,
-			placeHolder: "Link this code to entities/items",
+			placeHolder: "Link this code to entities/items/blocks",
 		});
 		if (chosen === undefined || chosen.length === 0) {
 			return;
@@ -83,6 +86,7 @@ function linkScript() {
 
 		const entities = chosen.filter(c => c.description === "entity").map(c => c.label);
 		const items = chosen.filter(c => c.description === "item").map(c => c.label);
+		const blocks = chosen.filter(c => c.description === "block").map(c => c.label);
 
 		const uri = editor.document.uri;
 		const line = editor.selection.start.line;
@@ -94,6 +98,9 @@ function linkScript() {
 		}
 		if (items.length > 0) {
 			annotationLines.push(`${indent}// @lantern-links-items ${JSON.stringify(items)}`);
+		}
+		if (blocks.length > 0) {
+			annotationLines.push(`${indent}// @lantern-links-blocks ${JSON.stringify(blocks)}`);
 		}
 
 		const edit = new vscode.WorkspaceEdit();
@@ -116,7 +123,8 @@ function openLinkedIdentifier(treeView: vscode.TreeView<vscode.TreeItem>, treeDa
 		const target =
 			parsedProject.bp_entity[identifier]?.path ??
 			parsedProject.rp_entity[identifier]?.path ??
-			parsedProject.bp_items[identifier];
+			parsedProject.bp_items[identifier]?.path ??
+			parsedProject.bp_blocks.find(([id]) => identifier === id)[0][1]?.path;
 		if (target === undefined) {
 			vscode.window.showWarningMessage(`Lantern: no file found for ${identifier}.`);
 			return;

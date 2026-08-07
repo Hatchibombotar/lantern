@@ -19,6 +19,11 @@ export class FlexibleRecord<K, V> {
             .filter((item) => fun(item))
     }
 
+    keys() {
+        const keys = this.list.map(([k, v]) => k)
+        return keys
+    }
+
     *[Symbol.iterator]() {
         for (const [key, value] of this.list) {
             yield { key, value }

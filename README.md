@@ -24,7 +24,6 @@ You can also run this using the command pallete under the command `Lantern: Impo
 
 This will download everything that links to the entity e.g. animations, render controllers
 
-
 ### Linking scripts to entities/items
 
 Scripts aren't tied to a single identifier, so you link them explicitly with a `@lantern-links-*` comment placed directly above the code it relates to:
@@ -45,13 +44,21 @@ world.afterEvents.itemUse.subscribe((event) => {
         // ...ruby use logic
     }
 })
+
+
+// @lantern-links-blocks ["custom:slab"]
+world.afterEvents.placeBlock.subscribe((event) => {
+    if (event.block.typeId === "custom:ruby") {
+        // ...slab use logic
+    }
+})
 ```
 
 This file now shows up as a child of `custom:goblin` and `custom:ruby` in the Lantern view.
 
 List several ids in one comment to link them all e.g. `// @lantern-links-entities ["custom:goblin", "custom:goblin_king"]`.
 
-The fastest way to add one: put your cursor on the relevant line in a `.ts`/`.js` file and right-click → **Link to Entity/Item**; the comment is inserted just above.
+The fastest way to add one: put your cursor on the relevant line in a `.ts`/`.js` file and right-click → **Link to Entity/Item/Block**; the comment is inserted just above.
 
 ## Requirements
 
