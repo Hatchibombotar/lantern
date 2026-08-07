@@ -3,7 +3,7 @@
   "displayName": "Lantern for Minecraft Bedrock",
   "description": "A proper IDE experience for Minecraft Bedrock Add-Ons",
   "icon": "images/icon.png",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "engines": {
     "vscode": "^1.107.0"
   },

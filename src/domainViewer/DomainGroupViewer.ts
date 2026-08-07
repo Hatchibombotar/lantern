@@ -4,7 +4,6 @@ import { getProjectContext } from '../analysis/context';
 import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder, ProjectFile, FileFolder } from './createFolderStructure';
 import path from 'path';
 import { ParsedProject, ScriptLink } from '../analysis/ParsedProject';
-import { ProjectParser } from '../analysis/ProjectParser';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
 	private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | null>();
