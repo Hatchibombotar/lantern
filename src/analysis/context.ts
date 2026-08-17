@@ -18,7 +18,7 @@ export function getProjectContext(): ProjectContext | undefined {
 	}
 	const configPath = rootPath + "/config.json";
 	if (!fs.existsSync(configPath)) {
-		vscode.window.showErrorMessage("Unable to find config.json");
+		// vscode.window.showErrorMessage("Unable to find config.json");
 		return;
 	}
 	const config = JSONC.parse(fs.readFileSync(configPath).toString());

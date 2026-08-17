@@ -12,14 +12,12 @@ import { registerProjectParseDiagnostics } from './diagnostics/projectParseDiagn
 
 
 let parsedProject: ParsedProject
-function getParsedProject() {
-	return parsedProject
-}
 
-function refreshParsedProject() {
+function refreshParsedProject(): boolean {
 	const projectContext = getProjectContext();
 	if (projectContext === undefined) {
-		throw Error("Project context not found.")
+		console.error("Project context not found.")
+		return false
 	}
 	const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectContext;
 
@@ -27,12 +25,14 @@ function refreshParsedProject() {
 		resourcePackDir, behaviorPackDir, workspaceRoot
 	)
 	parsedProject = parser.parseAll()
+
+	return true
 }
 
 export function activate(context: vscode.ExtensionContext) {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 
-	refreshParsedProject()
+	const parseSuccess = refreshParsedProject()
 
 	const domainGroupViewer = new DomainGroupViewer(
 		context,
@@ -46,6 +46,10 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		treeView
 	)
+	
+	if (!parseSuccess) {
+		treeView.message = "Unable to parse project. Does config.json exist in the project root?"
+	}
 
 	const refreshProjectParseDiagnostics = registerProjectParseDiagnostics(context)
 
@@ -57,7 +61,12 @@ export function activate(context: vscode.ExtensionContext) {
 			clearTimeout(refreshTimer)
 		}
 		refreshTimer = setTimeout(() => {
-			refreshParsedProject()
+			const parseSuccess = refreshParsedProject()
+			if (parseSuccess) {
+				treeView.message = undefined
+			} else {
+				treeView.message = "Unable to parse project. Does config.json exist in the project root?"
+			}
 			domainGroupViewer.refresh()
 			refreshProjectParseDiagnostics(parsedProject)
 		}, 300)

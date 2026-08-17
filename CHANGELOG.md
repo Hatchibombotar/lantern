@@ -4,6 +4,9 @@ All notable changes to the extension will be documented in this file.
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 
+## [Unreleased]
+- Removed error message that appears when no config.json file is found - it instead puts a warning message in the lantern treeview.
+
 ## [0.5.0]
 - Added support for blocks in the sidebar! This includes cullingRules, textures, and models!
 - Added an assets folders to entities and items, making your textures and models easy to get to!
