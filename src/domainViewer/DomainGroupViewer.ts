@@ -5,6 +5,7 @@ import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeIn
 import { ProjectFile } from '../analysis/AddonFileTypes';
 import path from 'path';
 import { ParsedProject, ScriptLink } from '../analysis/ParsedProject';
+import ExtensionRoot from '../ExtensionRoot';
 
 export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeItem> {
 	private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | null>();
@@ -12,11 +13,11 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 	context: vscode.ExtensionContext;
 
-	getParsedProject: () => ParsedProject
+	extensionRoot: ExtensionRoot
 
-	constructor(context: vscode.ExtensionContext, getParsedProject: () => ParsedProject, private workspaceRoot?: string) {
+	constructor(context: vscode.ExtensionContext, extensionRoot: ExtensionRoot, private workspaceRoot?: string) {
 		this.context = context;
-		this.getParsedProject = getParsedProject
+		this.extensionRoot = extensionRoot
 	}
 
 	refresh(node?: vscode.TreeItem) {
@@ -57,7 +58,8 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 				}
 				const { resourcePackDir, behaviorPackDir } = projectContext;
 
-				const parsedProject = this.getParsedProject()
+				const parsedProject = this.extensionRoot.getParsedProject()
+				if (parsedProject === undefined) return []
 
 				if (meta.rootType === "entities") {
 					const entities = parseEntitiesInFolder("/", parsedProject, behaviorPackDir, resourcePackDir, true);
@@ -152,10 +154,6 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 
 		// Show assets
 		if (entity.assets.length > 0) {
-			const icon = {
-				dark: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "folder.svg"),
-				light: vscode.Uri.joinPath(this.context.extensionUri, 'icons', "folder.svg"),
-			};
 
 			children.push(this.createFileFolder(
 				parent, "assets", entity.assets,
@@ -328,8 +326,10 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 		if (projectContext === undefined) {
 			return;
 		}
-		const { resourcePackDir, behaviorPackDir, workspaceRoot } = projectContext;
-		const parsedProject = this.getParsedProject()
+		const { resourcePackDir, behaviorPackDir } = projectContext;
+
+		const parsedProject = this.extensionRoot.getParsedProject()
+		if (parsedProject === undefined) return []
 
 		if (parsedProject === void 0) {
 			vscode.window.showErrorMessage("Unexpected Error");

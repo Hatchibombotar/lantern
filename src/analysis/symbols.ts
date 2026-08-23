@@ -19,7 +19,7 @@ export enum SymbolType {
     ItemTextureShortname,
 }
 
-const symbolTypeReadableName: Record<SymbolType, string> = {
+export const symbolTypeReadableName: Record<SymbolType, string> = {
     [SymbolType.EntityIdentifier]: "Entity Identifier",
     [SymbolType.BPAnimation]: "BP Animation",
     [SymbolType.BPAnimationController]: "BP Animation Controller",

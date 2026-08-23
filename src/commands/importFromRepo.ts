@@ -108,7 +108,7 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
             label: x.url,
             uuid: x.uuid,
         })), {
-            title: "Select snippet source"
+            title: "Import from Snippet Repository"
         })
 
         if (snippetSourceRepo === undefined) return
