@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import registerAllCommands from './actions';
-import registerVanillaDataCommands from './vanillaDataActions';
-import registerScriptLinkCommands from './scriptLinkActions';
+import registerCreateFileActions from './commands/createFileActions';
+import registerVanillaDataCommands from './commands/importFromVanilla';
+import registerScriptLinkCommands from './commands/scriptLinkActions';
 import { DomainGroupViewer } from './domainViewer/DomainGroupViewer';
 import { ScriptLinkCodeLensProvider } from './codelens/ScriptLinkCodeLensProvider';
 import { registerScriptLinkDiagnostics } from './diagnostics/scriptLinkDiagnostics';
@@ -9,7 +9,8 @@ import { getProjectContext } from './analysis/context';
 import { ProjectParser } from './analysis/ProjectParser';
 import { ParsedProject } from './analysis/ParsedProject';
 import { registerProjectParseDiagnostics } from './diagnostics/projectParseDiagnostics';
-
+import registerSnippetSourceCommands from './commands/importFromRepo';
+import registerEditActions from './commands/editActions';
 
 let parsedProject: ParsedProject
 
@@ -29,13 +30,13 @@ function refreshParsedProject(): boolean {
 	return true
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export function activate(extensionContext: vscode.ExtensionContext) {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 
 	const parseSuccess = refreshParsedProject()
 
 	const domainGroupViewer = new DomainGroupViewer(
-		context,
+		extensionContext,
 		() => parsedProject,
 		root,
 	)
@@ -43,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const treeView = vscode.window.createTreeView('bedrockLantern', {
 		treeDataProvider: domainGroupViewer
 	})
-	context.subscriptions.push(
+	extensionContext.subscriptions.push(
 		treeView
 	)
 	
@@ -51,7 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
 		treeView.message = "Unable to parse project. Does config.json exist in the project root?"
 	}
 
-	const refreshProjectParseDiagnostics = registerProjectParseDiagnostics(context)
+	const refreshProjectParseDiagnostics = registerProjectParseDiagnostics(extensionContext)
 
 	// Debounce: the watcher fires per file on bulk operations (builds, git ops),
 	// and a refresh re-runs the full project parse, so batch them.
@@ -75,17 +76,20 @@ export function activate(context: vscode.ExtensionContext) {
 	watcher.onDidCreate(scheduleRefresh)
 	watcher.onDidChange(scheduleRefresh)
 	watcher.onDidDelete(scheduleRefresh)
-	context.subscriptions.push(watcher)
+	extensionContext.subscriptions.push(watcher)
 
-	context.subscriptions.push(
+	extensionContext.subscriptions.push(
 		vscode.languages.registerCodeLensProvider(
 			[{ language: 'typescript' }, { language: 'javascript' }],
 			new ScriptLinkCodeLensProvider()
 		)
 	)
 
-	registerAllCommands(context)
-	registerVanillaDataCommands(context)
-	registerScriptLinkCommands(context, treeView as vscode.TreeView<vscode.TreeItem>, domainGroupViewer)
-	registerScriptLinkDiagnostics(context)
+	registerCreateFileActions(extensionContext)
+	registerEditActions(extensionContext)
+	registerVanillaDataCommands(extensionContext)
+	registerScriptLinkCommands(extensionContext, treeView as vscode.TreeView<vscode.TreeItem>, domainGroupViewer)
+	registerSnippetSourceCommands(extensionContext)
+
+	registerScriptLinkDiagnostics(extensionContext)
 }

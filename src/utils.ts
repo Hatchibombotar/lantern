@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
 import * as JSONC from "jsonc-parser"
-import { AddonFileTypes as FileType } from './AddonFileTypes';
-import { ProjectFile } from './domainViewer/createFolderStructure';
 import nodePath from "path"
 import * as fs from 'fs/promises';
 import { existsSync } from 'fs';
@@ -43,6 +41,7 @@ export function jsoncModifyandEditWithInitialisedParents(text: string, path: JSO
 
     }
 
+    // Set the value at the given path
     text = JSONC.applyEdits(text,
         JSONC.modify(text, path, value, { ...formatSettings, isArrayInsertion })
     )
@@ -72,9 +71,14 @@ export function objectModifyWithInitialisedParents(object: any, path: JSONC.JSON
     return object; // Return the modified object
 }
 
+export function getDataAtObjectPath(object: any, path: JSONC.JSONPath): any {
+    let value = object
+    for (const segment of path) {
+        if (value === undefined) return undefined
+        value = value[segment]
+    }
 
-export function getFilesOfType(fileType: FileType, files: ProjectFile[]) {
-    return files.filter(x => x.fileType === fileType)
+    return value
 }
 
 export async function readTemplate(context: vscode.ExtensionContext, template_name: string) {

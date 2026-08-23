@@ -1,0 +1,333 @@
+import fs from 'fs/promises';
+import path from 'path';
+import simpleGit from 'simple-git';
+import * as vscode from 'vscode';
+import { createGlobalStorageDirectory } from '../utils';
+import { globSync } from 'fs';
+import * as JSONC from 'jsonc-parser';
+import { ProjectParser } from '../analysis/ProjectParser';
+import { Importer } from '../importer/Importer';
+import { getIdentifierSymbols, getReferencedBlockSymbols, getReferencedEntitySymbols, getReferencedItemSymbols, selectRenamedSymbols, Symbol, symbolsEqual, SymbolType, SymbolValue } from '../analysis/symbols';
+import { selectRenameFiles } from '../quickPickUtils';
+import { renameSymbolFromIdentifier } from '../importer/renameSymbols';
+import { getAssetsForBlock, getAssetsForEntity, getAssetsForItem, getFilesForBlock, getFilesForEntity, getFilesForItem } from '../domainViewer/createFolderStructure';
+import { ProjectFile } from '../analysis/AddonFileTypes';
+import { renamePathFromIdentifier } from '../importer/renamePaths';
+import { AddonFileTypes } from '../analysis/AddonFileTypes';
+
+const uuidImport = import("uuid")
+
+type SnippetSourceMetaFile = {
+    name: string,
+    tags: string[],
+} & ({ type: "mcaddon" } |
+{ type: "mcpack", archive_root: string, })
+
+export default function registerSnippetSourceCommands(context: vscode.ExtensionContext) {
+    async function addSnippetSource() {
+        // Text input box
+        // Fetch repo
+        // If doesn't exist, show input box again
+        // If does exist:
+        // createGlobalStorageDirectory()
+        // Pull into globalStorage/snippetSources/<repoName>
+        const snippetSources = await readSnippetSources(context)
+
+        const repoUrl = await vscode.window.showInputBox({
+            title: "path",
+            placeHolder: "https://github.com/username/repo"
+        })
+
+        if (repoUrl === undefined) {
+            return
+        }
+
+        const uuid = (await uuidImport).v4()
+
+        snippetSources.snippetSourceRepos.push({
+            url: repoUrl,
+            uuid: uuid,
+        })
+
+        try {
+            await downloadSnippetSourceRepo(context, uuid, repoUrl)
+            await writeSnippetSources(context, snippetSources)
+
+            vscode.window.showInformationMessage(`Successfully downloaded snippet source`)
+        } catch (err) {
+            vscode.window.showErrorMessage(`Failed to download snippet source`)
+            vscode.window.showErrorMessage(String(err))
+            console.error(err)
+
+            await deleteSnippetSourceRepo(context, uuid)
+        }
+    }
+    vscode.commands.registerCommand("bedrockLantern.addSnippetSource", addSnippetSource)
+
+    async function deleteSnippetSources() {
+        const snippetSources = await readSnippetSources(context)
+        if (snippetSources.snippetSourceRepos.length === 0) {
+            vscode.window.showInformationMessage("No snippet sources defined.")
+            return
+        }
+        const result = await vscode.window.showQuickPick(snippetSources.snippetSourceRepos.map((x) => ({
+            label: x.url,
+            uuid: x.uuid,
+        })), {
+            canPickMany: true,
+            title: "Delete snippet sources"
+        })
+
+        if (result === undefined) return
+
+        const removeUuids = result.map(x => x.uuid)
+        const snippetSourceRepos = []
+
+        for (const x of snippetSources.snippetSourceRepos) {
+            if (removeUuids.includes(x.uuid)) {
+                await deleteSnippetSourceRepo(context, x.uuid)
+                continue
+            }
+            snippetSourceRepos.push(x)
+        }
+
+        snippetSources.snippetSourceRepos = snippetSourceRepos
+
+        vscode.window.showInformationMessage(`Removed ${removeUuids.length} snippet sources.`)
+        await writeSnippetSources(context, snippetSources)
+    }
+    vscode.commands.registerCommand("bedrockLantern.deleteSnippetSources", deleteSnippetSources)
+
+    async function importSnippet() {
+        const snippetSources = await readSnippetSources(context)
+        if (snippetSources.snippetSourceRepos.length === 0) {
+            vscode.window.showInformationMessage("No snippet sources defined.")
+            return
+        }
+        const snippetSourceRepo = await vscode.window.showQuickPick(snippetSources.snippetSourceRepos.map((x) => ({
+            label: x.url,
+            uuid: x.uuid,
+        })), {
+            title: "Select snippet source"
+        })
+
+        if (snippetSourceRepo === undefined) return
+        const snippetSourceUuid = snippetSourceRepo.uuid
+        const snippetSourcePath = await getPathForSnippet(context, snippetSourceUuid)
+
+        const snippetMetaFiles = globSync("**/meta.json", {
+            cwd: snippetSourcePath
+        })
+
+        const parsedSnippetFiles: [string, SnippetSourceMetaFile][] = []
+        for (const snippetMetaFile of snippetMetaFiles) {
+            const file = await fs.readFile(path.join(snippetSourcePath, snippetMetaFile))
+
+            const parsedMetaFile = JSONC.parse(String(file)) as SnippetSourceMetaFile
+
+            parsedSnippetFiles.push([snippetMetaFile, parsedMetaFile])
+        }
+
+        const snippet = await vscode.window.showQuickPick(parsedSnippetFiles.map(([metaPath, metaFile]) => ({
+            label: metaFile.name,
+            description: metaFile.tags.join(", "),
+            metaPath, metaFile,
+        })))
+
+        if (snippet === undefined) return
+
+        const { metaPath, metaFile } = snippet
+
+        const snippetPath = path.join(snippetSourcePath, path.dirname(metaPath))
+
+        const parser = new ProjectParser(
+            path.join(snippetPath, "rp"),
+            path.join(snippetPath, "bp"),
+        )
+
+        const sourceProject = parser.parseAll()
+
+        const identifiers = getIdentifierSymbols(sourceProject)
+
+        const newIdentifiers = await selectRenamedSymbols(identifiers)
+        if (newIdentifiers === undefined) return
+
+        const initialRenamedSymbols: [Symbol, SymbolValue][] = [...newIdentifiers]
+        const allSymbols: Symbol[] = [...identifiers]
+
+        for (const identifier of identifiers) {
+            let symbols!: Symbol[]
+
+            switch (identifier.type) {
+                case SymbolType.EntityIdentifier:
+                    symbols = getReferencedEntitySymbols(sourceProject, identifier.value)
+                    break
+                case SymbolType.BlockIdentifier:
+                    symbols = getReferencedBlockSymbols(sourceProject, identifier.value)
+                    break
+                case SymbolType.ItemIdentifier:
+                    symbols = getReferencedItemSymbols(sourceProject, identifier.value)
+                    break
+                default:
+                    throw Error("Identifier type not handled correctly: " + identifier)
+            }
+
+            const newIdentifier = newIdentifiers.find(([k]) => symbolsEqual(k, identifier))?.[1] ?? identifier.value
+
+            for (const symbol of symbols) {
+                const newValue = renameSymbolFromIdentifier(symbol, identifier.value, newIdentifier)
+                initialRenamedSymbols.push(
+                    [symbol, newValue]
+                )
+                allSymbols.push(symbol)
+            }
+        }
+
+        const renamedSymbols = await selectRenamedSymbols(allSymbols, initialRenamedSymbols)
+        if (renamedSymbols === undefined) return
+
+        const initialRenamedFiles: [ProjectFile, string][] = []
+
+        const allKnownFiles: ProjectFile[] = []
+
+        for (const identifier of identifiers) {
+            let files!: ProjectFile[]
+            const newIdentifier = newIdentifiers.find(([k]) => symbolsEqual(k, identifier))?.[1] ?? identifier.value
+
+            switch (identifier.type) {
+                case SymbolType.EntityIdentifier:
+                    files = getFilesForEntity(sourceProject, identifier.value)
+                    files.push(...getAssetsForEntity(sourceProject, identifier.value).filter(x=>x.fileType !== AddonFileTypes.rp_texture))
+                    break
+                case SymbolType.BlockIdentifier:
+                    files = getFilesForBlock(sourceProject, sourceProject.bp_blocks[identifier.value])
+                    files.push(...getAssetsForBlock(sourceProject, sourceProject.bp_blocks[identifier.value]).filter(x=>x.fileType !== AddonFileTypes.rp_texture))
+                    break
+                case SymbolType.ItemIdentifier:
+                    files = getFilesForItem(sourceProject, identifier.value)
+                    files.push(...getAssetsForItem(sourceProject, identifier.value).filter(x=>x.fileType !== AddonFileTypes.rp_texture))
+                    break
+                default:
+                    throw Error("Identifier type not handled correctly: " + identifier)
+            }
+
+            for (const file of files) {
+                const newPath = renamePathFromIdentifier(file, identifier.value, newIdentifier)
+                initialRenamedFiles.push([
+                    file, newPath
+                ])
+
+                allKnownFiles.push(file)
+            }
+        }
+
+        // TODO: Show all files using parser.getAllFiles()
+        const renamedFiles = await selectRenameFiles(
+            allKnownFiles,
+            initialRenamedFiles
+        )
+        if (renamedFiles === undefined) return
+
+        // If we wanted to include files not caught by the importer
+        // const allFiles = parser.getAllFiles()
+
+        // if (allKnownFiles.length !== parser.getAllFiles().length) {
+        //     const extraFiles = []
+        //     for (const file of allFiles) {
+        //         if (!allKnownFiles.find((knownFile) => filePathsEqual(knownFile.path, file))) {
+        //             extraFiles.push(file)
+        //         }
+        //     }
+        // }
+
+        const importer = new Importer(
+            parser,
+            renamedSymbols,
+            renamedFiles.map(([file, newPath]) => [file.path, newPath]),
+        )
+
+        console.log(allSymbols)
+
+        await importer.importSymbolsFromProject(allSymbols)
+
+    }
+    vscode.commands.registerCommand("bedrockLantern.importSnippet", importSnippet)
+}
+
+async function getPathForSnippet(context: vscode.ExtensionContext, uuid: string) {
+    const globalStoragePath = await createGlobalStorageDirectory(context)
+    const resultPath = path.join(globalStoragePath, "./snippetSources/" + uuid + "/")
+
+    return resultPath
+}
+
+async function deleteSnippetSourceRepo(context: vscode.ExtensionContext, uuid: string) {
+    const resultPath = await getPathForSnippet(context, uuid)
+
+    fs.rm(resultPath, {
+        recursive: true,
+    })
+}
+
+
+async function downloadSnippetSourceRepo(context: vscode.ExtensionContext, uuid: string, url: string) {
+    const resultPath = await getPathForSnippet(context, uuid)
+
+    await fs.mkdir(resultPath, {
+        recursive: true
+    })
+
+    await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Fetching repository',
+            cancellable: false
+        },
+        async (progress) => {
+            progress.report({ increment: 0 });
+
+            const git = simpleGit(resultPath, {
+                progress: (data) => {
+                    const per = data.processed / data.total
+                    progress.report({ increment: per, message: `(${data.stage} ${data.processed}/${data.total})` });
+                }
+            })
+            const branch = "main"
+            await git.clone(url, resultPath, ["--depth", "1", "--single-branch", '--branch', branch])
+
+            progress.report({ increment: 100 });
+        }
+    )
+}
+
+
+type SnippetSourceDefinition = {
+    version: 0,
+    snippetSourceRepos: {
+        url: string,
+        uuid: string
+    }[]
+}
+
+// read/write globalStorage/snippetSources.json
+async function readSnippetSources(context: vscode.ExtensionContext): Promise<SnippetSourceDefinition> {
+    const uri = vscode.Uri.joinPath(context.globalStorageUri, "snippetSources.json")
+    try {
+        const content = await vscode.workspace.fs.readFile(uri)
+        const parsedContent = JSON.parse(String(content))
+        return parsedContent as SnippetSourceDefinition
+    } catch (err) {
+        console.error(err)
+        return {
+            version: 0,
+            snippetSourceRepos: []
+        }
+    }
+}
+
+async function writeSnippetSources(context: vscode.ExtensionContext, data: SnippetSourceDefinition) {
+    const uri = vscode.Uri.joinPath(context.globalStorageUri, "snippetSources.json")
+    const content = Buffer.from(JSON.stringify(data), 'utf8')
+
+    await vscode.workspace.fs.writeFile(uri, content)
+}

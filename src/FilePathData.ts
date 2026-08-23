@@ -1,5 +1,9 @@
-import * as path from 'path';
+import path from 'path';
 
+/**
+ * A representation of a file path for files within add-on folders.
+ * Used to simplify code that copies files from one add-on to another as well as validation.
+*/ 
 export type FilePathData = {
 	relativePath: string; // the path relative to the RP/BP directory. e.g. entity\awesome.entity.json
 	rootType: "bp" | "rp";
@@ -10,7 +14,7 @@ export function filePathsEqual(a: FilePathData, b: FilePathData) {
 	return a.exactPath === b.exactPath;
 }
 
-export function changeFilePathBase(filePath: FilePathData, resourcePackDir: string, behaviorPackDir: string) {
+export function changeFilePathBase(filePath: FilePathData, resourcePackDir: string, behaviorPackDir: string): FilePathData {
 	const newFilePath = { ...filePath };
 	if (newFilePath.rootType === "bp") {
 		newFilePath.exactPath = path.join(behaviorPackDir, newFilePath.relativePath);

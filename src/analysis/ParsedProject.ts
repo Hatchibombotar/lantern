@@ -1,5 +1,4 @@
 import { FilePathData } from '../FilePathData';
-import { FlexibleRecord, FlexibleRecordError } from './FlexibleRecord';
 import { ScriptAnnotation } from './scriptLinks';
 import { SymbolValue } from './symbols';
 
@@ -57,17 +56,17 @@ export type ParsedProject = {
 		textures: string[];
 	}>;
 
-	"bp_blocks": FlexibleRecord<SymbolValue, ParsedProject.BPBlock>;
+	"bp_blocks": Record<SymbolValue, ParsedProject.BPBlock>;
 
 	"script_links": ScriptLink[];
 
-	errors: FlexibleRecordError[]
+	errors: ProjectParseError[]
 };
 
 export namespace ParsedProject {
 	export type BPBlock = {
 		path: FilePathData;
-		cullingRules: string[];
+		cullingRules: SymbolValue[];
 		models: SymbolValue[];
 
 		textureShortnames: SymbolValue[];
@@ -80,4 +79,31 @@ export namespace ParsedProject {
 export type ScriptLink = ScriptAnnotation & {
 	scriptPath: string,
 	relativePath: string,
+}
+export type ProjectParseError = {
+	message: string
+	path: string
+}
+
+
+export type TerrainTextureAtlas = {
+	"resource_pack_name": string,
+	"texture_name": "atlas.terrain",
+	"padding": number,
+	"num_mip_levels": number,
+	"texture_data": Record<string,
+		{ "textures": string } |
+		{ "textures": string[] } |
+		{ "textures": {path: string, overlay_color: string} } |
+		{ "textures": {path: string, overlay_color: string}[] }
+	>
+}
+
+export type ItemTextureAtlas = {
+	"resource_pack_name": string,
+	"texture_name": "atlas.items",
+	"texture_data": Record<string,
+		{ "textures": string } |
+		{ "textures": string[] }
+	>
 }

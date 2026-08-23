@@ -79,14 +79,10 @@
         "title": "Create Item",
         "enablement": "view == bedrockLantern"
       },
-
-
       {
-        "command": "bedrockLantern.entityCopyIdentifier",
-        "title": "Copy Entity Identifier",
-        "enablement": "view == bedrockLantern"
+        "command": "bedrockLantern.copyIdentifier",
+        "title": "Copy Identifier"
       },
-
       {
         "command": "bedrockLantern.entityCreateBPEntity",
         "title": "Create BP Entity",
@@ -102,7 +98,6 @@
         "title": "Create BP Animation Controller",
         "enablement": "view == bedrockLantern"
       },
-
       {
         "command": "bedrockLantern.entityCreateRPEntity",
         "title": "Create RP Entity",
@@ -123,20 +118,11 @@
         "title": "Create RP Render Controller",
         "enablement": "view == bedrockLantern"
       },
-
-
-      {
-        "command": "bedrockLantern.itemCopyIdentifier",
-        "title": "Copy Item Identifier",
-        "enablement": "view == bedrockLantern"
-      },
-
       {
         "command": "bedrockLantern.itemCreateBPItem",
         "title": "Create BP Item",
         "enablement": "view == bedrockLantern"
       },
-
       {
         "command": "bedrockLantern.itemAttachableCreateRPEntity",
         "title": "Create Attachable",
@@ -157,7 +143,6 @@
         "title": "Create Attachable Render Controller",
         "enablement": "view == bedrockLantern"
       },
-
       {
         "command": "bedrockLantern.linkScript",
         "title": "Link to Entity/Item/Block",
@@ -167,9 +152,49 @@
         "command": "bedrockLantern.openLinkedIdentifier",
         "title": "Open Linked Entity/Item/Block",
         "category": "Lantern"
+      },
+      {
+        "command": "bedrockLantern.addSnippetSource",
+        "title": "Add new snippet source",
+        "category": "Lantern"
+      },
+      {
+        "command": "bedrockLantern.deleteSnippetSources",
+        "title": "Delete snippet sources",
+        "category": "Lantern"
+      },
+      {
+        "command": "bedrockLantern.importSnippet",
+        "title": "Import Snippet from Source",
+        "category": "Lantern",
+        "icon": "$(package)"
+      },
+      {
+        "command": "bedrockLantern.deleteFromNode",
+        "title": "Delete",
+        "enablement": "view == bedrockLantern"
+      },
+      {
+        "command": "bedrockLantern.goToSymbol",
+        "title": "Go To...",
+        "category": "Lantern",
+        "icon": "$(search)"
       }
+
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "bedrockLantern.goToSymbol",
+          "when": "view == bedrockLantern",
+          "group": "navigation"
+        },
+        {
+          "command": "bedrockLantern.importSnippet",
+          "when": "view == bedrockLantern",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
         {
           "command": "bedrockLantern.createEntity",
@@ -186,14 +211,11 @@
           "when": "view == bedrockLantern && viewItem == folder_items",
           "group": "createItem"
         },
-
-
         {
-          "command": "bedrockLantern.entityCopyIdentifier",
+          "command": "bedrockLantern.copyIdentifier",
           "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "aboutEntity"
         },
-
         {
           "command": "bedrockLantern.entityCreateBPEntity",
           "when": "view == bedrockLantern && viewItem == node_entities",
@@ -209,7 +231,6 @@
           "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileBP"
         },
-
         {
           "command": "bedrockLantern.entityCreateRPEntity",
           "when": "view == bedrockLantern && viewItem == node_entities",
@@ -230,11 +251,8 @@
           "when": "view == bedrockLantern && viewItem == node_entities",
           "group": "createEntityFileRP"
         },
-
-
-
         {
-          "command": "bedrockLantern.itemCopyIdentifier",
+          "command": "bedrockLantern.copyIdentifier",
           "when": "view == bedrockLantern && viewItem == node_items",
           "group": "aboutItem"
         },
@@ -243,8 +261,6 @@
           "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileBP"
         },
-
-
         {
           "command": "bedrockLantern.itemAttachableCreateRPEntity",
           "when": "view == bedrockLantern && viewItem == node_items",
@@ -264,6 +280,28 @@
           "command": "bedrockLantern.itemAttachableCreateRPRenderController",
           "when": "view == bedrockLantern && viewItem == node_items",
           "group": "createItemFileRP"
+        },
+
+        {
+          "command": "bedrockLantern.copyIdentifier",
+          "when": "view == bedrockLantern && viewItem == node_blocks",
+          "group": "aboutBlock"
+        },
+
+        {
+          "command": "bedrockLantern.deleteFromNode",
+          "when": "view == bedrockLantern && viewItem == node_entities",
+          "group": "editEntity"
+        },
+        {
+          "command": "bedrockLantern.deleteFromNode",
+          "when": "view == bedrockLantern && viewItem == node_items",
+          "group": "editItem"
+        },
+        {
+          "command": "bedrockLantern.deleteFromNode",
+          "when": "view == bedrockLantern && viewItem == node_blocks",
+          "group": "editBlock"
         }
       ],
       "editor/context": [
@@ -305,6 +343,7 @@
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1",
-    "simple-git": "^3.20.0"
+    "simple-git": "^3.20.0",
+    "uuid": "^14.0.1"
   }
 }

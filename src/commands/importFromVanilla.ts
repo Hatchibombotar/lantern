@@ -2,16 +2,18 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { simpleGit, SimpleGitProgressEvent } from 'simple-git';
-import { createGlobalStorageDirectory } from './utils';
+import { createGlobalStorageDirectory } from '../utils';
 import { existsSync } from 'fs';
-import { AddonFileTypes } from './AddonFileTypes';
-import { filePathsEqual } from './FilePathData';
-import { ParsedProject } from './analysis/ParsedProject';
-import { Node, ProjectFile } from './domainViewer/createFolderStructure';
-import { getFilesForEntity } from './domainViewer/createFolderStructure';
-import { getReferencedEntitySymbols, selectRenamedSymbols, Symbol, SymbolType, SymbolValue } from './analysis/symbols';
-import { Importer } from './importer';
-import { ProjectParser } from './analysis/ProjectParser';
+import { AddonFileTypes } from '../analysis/AddonFileTypes';
+import { ParsedProject } from '../analysis/ParsedProject';
+import { Node } from '../domainViewer/createFolderStructure';
+import { ProjectFile } from '../analysis/AddonFileTypes';
+import { getFilesForEntity } from '../domainViewer/createFolderStructure';
+import { getReferencedEntitySymbols, selectRenamedSymbols, Symbol, SymbolType, SymbolValue } from '../analysis/symbols';
+import { Importer } from '../importer/Importer';
+import { ProjectParser } from '../analysis/ProjectParser';
+import { selectRenameFiles, selectRenameIdentifiers } from '../quickPickUtils';
+import { renameSymbolFromIdentifier } from '../importer/renameSymbols';
 
 // export default function registerVanillaDataCommands(context: vscode.ExtensionContext) {
 //     context.subscriptions.push(
@@ -71,14 +73,14 @@ export default function registerImportEntityFromVanillaData(context: vscode.Exte
             path.join(samplesFolderPath, "resource_pack"),
             path.join(samplesFolderPath, "behavior_pack"),
         )
-        const parsedProject = parser.parseAll()
-        if (parsedProject === undefined) {
-            vscode.window.showErrorMessage("Unexpected Error")
-            return []
-        }
+        // const parsedProject = parser.parseAll()
+        // if (parsedProject === undefined) {
+        //     vscode.window.showErrorMessage("Unexpected Error")
+        //     return []
+        // }
 
         await importEntityFromProject(
-            parsedProject,
+            parser,
             folderPath
         )
 
@@ -103,9 +105,11 @@ async function selectVanillaDataSource(context: vscode.ExtensionContext) {
 3. Rename symbols
 4. Rename files
 */
-async function importEntityFromProject(importProject: ParsedProject, folderPath?: string) {
+async function importEntityFromProject(projectParser: ProjectParser, folderPath?: string) {
+    const sourceProject = projectParser.parseAll()
+
     // 1. Select entity
-    const entityId = await vscode.window.showQuickPick(Object.keys(importProject.bp_entity), {
+    const entityId = await vscode.window.showQuickPick(Object.keys(sourceProject.bp_entity), {
         title: "What would you like to import into your project?"
     })
     if (entityId === undefined) return
@@ -121,12 +125,12 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
 
     const newIdentifier = newIdentifiers[entityId]
 
-    const symbols = getReferencedEntitySymbols(importProject, entityId)
+    const symbols = getReferencedEntitySymbols(sourceProject, entityId)
     if (symbols === undefined) return
 
     // 3. Rename symbols
     const initialRenamedSymbols: [Symbol, SymbolValue][] = [
-        [{ type: SymbolType.EntityIdentifer, value: entityId }, newIdentifier]
+        [{ type: SymbolType.EntityIdentifier, value: entityId }, newIdentifier]
     ]
 
     const originalName = entityId.split(":")[1]
@@ -134,37 +138,16 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
     const newName = newIdentifier.split(":")[1]
 
     for (const symbol of symbols) {
-        switch (symbol.type) {
-            case SymbolType.BPAnimation:
-            case SymbolType.RPAnimation: {
-                const splitName = symbol.value.split(".")
-                if (splitName[1] === originalName) {
-                    const newSymbolValue = [splitName[0], newNamespace, newName, ...splitName.slice(2)].join(".")
-                    initialRenamedSymbols.push(
-                        [symbol, newSymbolValue]
-                    )
-                }
-                break;
-            }
-            case SymbolType.RPRenderController:
-            case SymbolType.BPAnimationController:
-            case SymbolType.RPAnimationController: {
-                const splitName = symbol.value.split(".")
-                if (splitName[2] === originalName) {
-                    const newSymbolValue = [splitName[0], splitName[1], newNamespace, newName, ...splitName.slice(3)].join(".")
-                    initialRenamedSymbols.push(
-                        [symbol, newSymbolValue]
-                    )
-                }
-                break;
-            }
-        }
+        const newSymbolValue = renameSymbolFromIdentifier(symbol, entityId, newIdentifier)
+        initialRenamedSymbols.push(
+            [symbol, newSymbolValue]
+        )
     }
 
     const renamedSymbols = await selectRenamedSymbols(symbols, initialRenamedSymbols)
     if (renamedSymbols === undefined) return
 
-    const files = getFilesForEntity(importProject, entityId)
+    const files = getFilesForEntity(sourceProject, entityId)
 
     // 4. Rename files
     const initialRenamedFiles: [ProjectFile, string][] = []
@@ -253,143 +236,16 @@ async function importEntityFromProject(importProject: ParsedProject, folderPath?
     if (renamedFiles === undefined) return
 
     const importer = new Importer(
-        importProject,
-        symbols,
+        projectParser,
         renamedSymbols,
         renamedFiles.map(([file, newPath]) => [file.path, newPath]),
     )
     try {
-        await importer.importSymbolsFromProject()
+        await importer.importSymbolsFromProject(symbols)
     } catch (err) {
         vscode.window.showErrorMessage(new Error(err as any).message)
         vscode.window.showErrorMessage("An error occured when trying to import.")
         console.error(err)
-    }
-}
-
-// Returns a map from the original path to the new path. (Both relative to their RP/BP folder.)
-async function selectRenameFiles(files: ProjectFile[], initialRenamed?: [ProjectFile, string][]): Promise<undefined | [ProjectFile, string][]> {
-    interface QuickPickItem extends vscode.QuickPickItem {
-        data?: ProjectFile
-        index?: number
-    }
-
-    // const renames: [ProjectFile, string][] = files.map(x => [x, x.path.relativePath])
-
-    const renames: [ProjectFile, string][] = files.map(x => {
-        const alreadyRenamedFile = initialRenamed?.find((([y]) => filePathsEqual(x.path, y.path) && x.fileType === y.fileType))
-
-        if (alreadyRenamedFile !== undefined) {
-            return [x, alreadyRenamedFile[1]]
-        }
-        return [x, x.path.relativePath]
-    })
-
-
-    while (true) {
-        const options: QuickPickItem[] = [
-            { label: "Continue" },
-            { label: "identifiers", kind: vscode.QuickPickItemKind.Separator },
-        ]
-        for (const [index, file] of files.entries()) {
-            const option: QuickPickItem = {
-                description: file.path.rootType + "\\" + file.path.relativePath,
-                data: file,
-                index,
-                label: file.path.rootType + "\\" + renames[index][1]
-            }
-            options.push(option)
-        }
-        const result = await vscode.window.showQuickPick(options, {
-            title: "Rename files",
-            // TODO: add validation; make sure it is located within correct dir.
-        })
-
-        if (result === undefined) {
-            return undefined
-        }
-
-        if (result.index === undefined) {
-            break
-        }
-
-        if (result.data === undefined) {
-            break
-        }
-
-        const prefix = result.data.path.rootType + "\\"
-        const initialValue = prefix + result.data.path.relativePath
-        const newPath = await vscode.window.showInputBox({
-            placeHolder: initialValue,
-            value: initialValue,
-            prompt: `Rename ${result.data.path.relativePath}`,
-            validateInput(value) {
-                if (!value.startsWith(prefix)) {
-                    return "path must start with " + prefix
-                }
-
-                const newRelativePath = value.slice(prefix.length)
-                // TODO: show error if file already exists.
-            }
-        })
-
-        if (newPath !== undefined) {
-            renames[result.index][1] = newPath.slice(prefix.length)
-        }
-    }
-    return renames
-}
-
-
-async function selectRenameIdentifiers(identifierMap: Record<string, string>): Promise<undefined | Record<string, string>> {
-    interface QuickPickItem extends vscode.QuickPickItem {
-        identifierToRename?: string
-    }
-    while (true) {
-        const options: QuickPickItem[] = [
-            { label: "Continue" },
-            { label: "identifiers", kind: vscode.QuickPickItemKind.Separator },
-        ]
-        for (const [k, v] of Object.entries(identifierMap)) {
-            const option: QuickPickItem = {
-                label: v
-            }
-
-            if (k === v) {
-                option.description = "Unchanged"
-            } else {
-                option.description = `(${k})`
-            }
-            option.identifierToRename = k
-            options.push(option)
-        }
-        const result = await vscode.window.showQuickPick(options, {
-            title: "Rename identifiers",
-        })
-
-        if (result === undefined) {
-            return undefined
-        }
-        if (result.identifierToRename === undefined) {
-            return identifierMap
-        }
-
-        const newIdentifier = await vscode.window.showInputBox({
-            placeHolder: identifierMap[result.identifierToRename],
-            validateInput(value) {
-                if (value.split(":").length !== 2) {
-                    return "identifier must include a ':' e.g. namespace:entity"
-                } else if (value.split(":").some(x => x.length === 0)) {
-                    return "identifier must be formatted correctly e.g. namespace:entity"
-                } else if (value.includes(" ")) {
-                    return "identifier must not include spaces."
-                }
-            },
-        })
-
-        if (newIdentifier !== undefined) {
-            identifierMap[result.identifierToRename] = newIdentifier
-        }
     }
 }
 

@@ -1,13 +1,22 @@
 import * as path from 'path';
 import * as fs from 'fs';
 
-export type ProjectFile = { fileType: AddonFileTypes; path: FilePathData; };
-
-import { AddonFileTypes } from '../AddonFileTypes';
-import { FilePathData } from '../FilePathData';
+import { AddonFileTypes, ProjectFile } from '../analysis/AddonFileTypes';
 import { ParsedProject, ScriptLink } from '../analysis/ParsedProject';
+import { Symbol, SymbolType } from '../analysis/symbols';
 
 export type Category = "entities" | "items" | "blocks"
+
+export function categoryToSymbol(c: Category): SymbolType {
+	switch (c) {
+		case 'entities':
+			return SymbolType.EntityIdentifier
+		case 'items':
+			return SymbolType.ItemIdentifier
+		case 'blocks':
+			return SymbolType.BlockIdentifier
+	}
+}
 
 export type Root = {
 	type: "root",
@@ -210,26 +219,27 @@ export function parseBlocksInFolder(folderPath: string, projectData: ParsedProje
 
 	const BPBlockFiles = fs.globSync(path.join(BPPath, "/*.json"))
 	for (const BPBlockFile of BPBlockFiles) {
-		const bp_blocks = projectData.bp_blocks.find(([k, v]) => {
-			return BPBlockFile === v.path.exactPath
-		})
 
-		for (const [identifier, bp_block] of bp_blocks) {
-			const files = getFilesForBlock(projectData, bp_block)
-			const assets = getAssetsForBlock(projectData, bp_block)
+		const [identifier, bp_block] = Object.entries(projectData.bp_blocks).find(([_, item]) => item.path.exactPath === BPBlockFile) ?? []
 
-			const entityInfo: NodeInfo = {
-				type: "element",
-				identifier: identifier,
-				files,
-				assets,
-				scriptLinks: getScriptsForIdentifier(projectData, identifier, "blocks"),
-				category: "blocks",
-				path: folderPath,
-			}
-
-			folder.children.push(entityInfo)
+		if (identifier === undefined || bp_block === undefined) {
+			continue
 		}
+
+		const files = getFilesForBlock(projectData, bp_block)
+		const assets = getAssetsForBlock(projectData, bp_block)
+
+		const entityInfo: NodeInfo = {
+			type: "element",
+			identifier: identifier,
+			files,
+			assets,
+			scriptLinks: getScriptsForIdentifier(projectData, identifier, "blocks"),
+			category: "blocks",
+			path: folderPath,
+		}
+
+		folder.children.push(entityInfo)
 	}
 
 	if (!isRoot && folder.children.length === 1 && isFolder(folder.children[0])) {
@@ -258,6 +268,27 @@ export function getScriptsForIdentifier(parsedProject: ParsedProject, identifier
 		links.push(link)
 	}
 	return links
+}
+
+export function getFilesForIdentifierSymbol(identifier: Symbol, sourceProject: ParsedProject): ProjectFile[] {
+	let files = []
+	switch (identifier.type) {
+		case SymbolType.EntityIdentifier:
+			files = getFilesForEntity(sourceProject, identifier.value)
+			files.push(...getAssetsForEntity(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
+			break
+		case SymbolType.BlockIdentifier:
+			files = getFilesForBlock(sourceProject, sourceProject.bp_blocks[identifier.value])
+			files.push(...getAssetsForBlock(sourceProject, sourceProject.bp_blocks[identifier.value]).filter(x => x.fileType !== AddonFileTypes.rp_texture))
+			break
+		case SymbolType.ItemIdentifier:
+			files = getFilesForItem(sourceProject, identifier.value)
+			files.push(...getAssetsForItem(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
+			break
+		default:
+			throw Error("Identifier type not handled correctly: " + identifier)
+	}
+	return files
 }
 
 // Functions that get all files that are referenced within 
@@ -420,6 +451,7 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 
 	return projectFiles;
 }
+// TODO: Make getFilesFor___ functions have consistant parameters
 export function getFilesForBlock(parsedProject: ParsedProject, block: ParsedProject.BPBlock): ProjectFile[] {
 	const files: ProjectFile[] = []
 	if (block) {
@@ -463,7 +495,7 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 	}
 
 	for (const textureIdentifier of rp_entity.textures) {
-		const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
+		const texture = parsedProject.rp_textures[textureIdentifier]
 		if (texture === undefined) continue
 		for (const textureFile of texture.files) {
 			files.push({
@@ -494,7 +526,7 @@ export function getAssetsForBlock(parsedProject: ParsedProject, bp_block: Parsed
 
 	for (const textureIdentifier of bp_block.textures) {
 		// TODO: Show error objects if it doesn't exist
-		const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
+		const texture = parsedProject.rp_textures[textureIdentifier]
 		if (texture === undefined) continue
 		for (const textureFile of texture.files) {
 			files.push({
@@ -518,7 +550,7 @@ export function getAssetsForItem(parsedProject: ParsedProject, identifier: strin
 
 	for (const textureIdentifier of bp_items.textures) {
 		// TODO: Show error objects if it doesn't exist
-		const texture = parsedProject.rp_textures[textureIdentifier.replaceAll("/", path.sep)]
+		const texture = parsedProject.rp_textures[textureIdentifier]
 		if (texture === undefined) continue
 		for (const textureFile of texture.files) {
 			files.push({

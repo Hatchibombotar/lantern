@@ -2,9 +2,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import * as JSONC from "jsonc-parser"
-import { ParsedProject, ScriptLink } from './ParsedProject';
-import { FlexibleRecord, FlexibleRecordError } from './FlexibleRecord';
-import { getDetailedPathInfo } from '../FilePathData';
+import { ItemTextureAtlas, ParsedProject, ScriptLink, TerrainTextureAtlas } from './ParsedProject';
+import { ProjectParseError } from "./ParsedProject";
+import { FilePathData, getDetailedPathInfo } from '../FilePathData';
 import { SymbolValue } from './symbols';
 import { parseScriptAnnotations } from './scriptLinks';
 
@@ -13,7 +13,7 @@ export class ProjectParser {
     behaviorPackDir: string
     scanRoot?: string
 
-    errors: FlexibleRecordError[]
+    errors: ProjectParseError[]
 
     constructor(resourcePackDir: string, behaviorPackDir: string, scanRoot?: string) {
         this.resourcePackDir = resourcePackDir
@@ -45,7 +45,7 @@ export class ProjectParser {
             bp_items: bpItems,
             bp_blocks: bpBlocks,
             script_links: this.parseScriptLinks(rpEntities, bpEntities, bpItems, bpBlocks),
-            errors: []
+            errors: [],
         }
 
         parsedProject.errors = this.errors
@@ -65,6 +65,29 @@ export class ProjectParser {
                 path
             })
         }
+    }
+
+    public getAllFiles(): FilePathData[] {
+        const files: FilePathData[] = []
+        const rpfiles = fs.globSync("**/*.*", { cwd: this.resourcePackDir })
+        const bpfiles = fs.globSync("**/*.*", { cwd: this.behaviorPackDir })
+
+        for (const file of rpfiles) {
+            files.push({
+                exactPath: path.join(this.resourcePackDir, file),
+                relativePath: file,
+                rootType: "rp"
+            })
+        }
+        for (const file of bpfiles) {
+            files.push({
+                exactPath: path.join(this.behaviorPackDir, file),
+                relativePath: file,
+                rootType: "bp"
+            })
+        }
+
+        return files
     }
 
     private parseRPEntities(): ParsedProject["rp_entity"] {
@@ -109,6 +132,11 @@ export class ProjectParser {
 
             const models = Object.values(parsedFile["minecraft:client_entity"]?.description?.geometry ?? {})
             const textures = Object.values(parsedFile["minecraft:client_entity"]?.description?.textures ?? {})
+
+            if (rp_entities[identifier] !== undefined) {
+                this.addError("Multiple RP entity files have the same identifier.", path)
+                this.addError("Multiple RP entity files have the same identifier.", rp_entities[identifier].path.exactPath)
+            }
 
             rp_entities[identifier] = {
                 path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
@@ -295,6 +323,11 @@ export class ProjectParser {
                 continue
             }
 
+            if (bp_entities[identifier] !== undefined) {
+                this.addError("Multiple BP entity files have the same identifier.", path)
+                this.addError("Multiple BP entity files have the same identifier.", bp_entities[identifier].path.exactPath)
+            }
+
             bp_entities[identifier] = {
                 path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
                 animations: Object.values(parsedFile["minecraft:entity"]?.description?.animations ?? {}),
@@ -357,6 +390,11 @@ export class ProjectParser {
                 }
             }
 
+            if (bp_items[identifier] !== undefined) {
+                this.addError("Multiple BP item files have the same identifier.", path)
+                this.addError("Multiple BP item files have the same identifier.", bp_items[identifier].path.exactPath)
+            }
+
             bp_items[identifier] = {
                 path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
                 textureShortnames,
@@ -396,7 +434,7 @@ export class ProjectParser {
         const blocksJsonData = this.parseBlocksJsonData()
         const terrainTextureData = this.parseTerrainTextureData()
 
-        const bp_blocks: ParsedProject["bp_blocks"] = new FlexibleRecord()
+        const bp_blocks: ParsedProject["bp_blocks"] = {}
         const bp_block_files = fs.globSync(path.join(this.behaviorPackDir, "./blocks/**/*.json"))
         for (const path of bp_block_files) {
             const file = fs.readFileSync(path).toString()
@@ -419,8 +457,14 @@ export class ProjectParser {
             const cullingIdentifiers: SymbolValue[] = []
             const models: SymbolValue[] = []
             for (const geo of geometryComponents) {
-                if (!models.includes(geo.identifier)) {
-                    models.push(geo.identifier)
+                let identifier;
+                if (typeof geo === "string") {
+                    identifier = geo
+                } else {
+                    identifier = geo.identifier
+                }
+                if (identifier && !models.includes(identifier)) {
+                    models.push(identifier)
                 }
                 if (geo?.culling && !cullingIdentifiers.includes(geo.culling)) {
                     cullingIdentifiers.push(geo.culling)
@@ -449,7 +493,7 @@ export class ProjectParser {
             const textures: string[] = []
             if (terrainTextureData) {
                 for (const shortname of textureShortnames) {
-                    const textureData = terrainTextureData[shortname]?.textures
+                    const textureData = terrainTextureData["texture_data"][shortname]?.textures
                     if (typeof textureData === "object" && Array.isArray(textureData)) {
                         textures.push(...textureData.map((x: any) => {
                             if (typeof x === "string") {
@@ -466,13 +510,18 @@ export class ProjectParser {
                 }
             }
 
-            bp_blocks.addValue(identifier, {
+            if (bp_blocks[identifier] !== undefined) {
+                this.addError("Multiple BP block files have the same identifier.", path)
+                this.addError("Multiple BP block files have the same identifier.", bp_blocks[identifier].path.exactPath)
+            }
+
+            bp_blocks[identifier] = {
                 path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
                 cullingRules: cullingIdentifiers,
                 models,
                 textureShortnames,
                 textures,
-            })
+            }
         }
 
         return bp_blocks
@@ -520,7 +569,8 @@ export class ProjectParser {
             const inGameTexturePath = path.relative(
                 this.resourcePackDir,
                 path.join(parsedPath.dir, parsedPath.name)
-            )
+            ).replaceAll("\\", "/")
+
             if (rp_textures[inGameTexturePath] === undefined) {
                 rp_textures[inGameTexturePath] = {
                     files: []
@@ -565,17 +615,30 @@ export class ProjectParser {
         return blocksJsonData
     }
 
-    private parseTerrainTextureData() {
+    // TODO: validate when parsing e.g. using zod.
+    parseTerrainTextureData(): TerrainTextureAtlas | null {
         const terrainTexturePath = path.join(this.resourcePackDir, "textures/terrain_texture.json")
-        let terrainTextureData;
+        
         if (fs.existsSync(terrainTexturePath)) {
             const terrainTextureFile = fs.readFileSync(terrainTexturePath).toString()
             const terrainTexture = JSONC.parse(terrainTextureFile)
 
-            terrainTextureData = terrainTexture["texture_data"]
+            return terrainTexture
+        } else {
+            return null
         }
+    }
+    parseItemTextureData(): ItemTextureAtlas | null {
+        const itemTexturePath = path.join(this.resourcePackDir, "textures/item_texture.json")
+        
+        if (fs.existsSync(itemTexturePath)) {
+            const file = fs.readFileSync(itemTexturePath).toString()
+            const parsedFile = JSONC.parse(file)
 
-        return terrainTextureData
+            return parsedFile
+        } else {
+            return null
+        }
     }
 
     private parseScriptLinks(rp_entities: ParsedProject["rp_entity"], bp_entities: ParsedProject["bp_entity"], bp_items: ParsedProject["bp_items"], bp_blocks: ParsedProject["bp_blocks"]) {
@@ -585,7 +648,7 @@ export class ProjectParser {
             // these lets us drop typos / renamed ids (surfaced as diagnostics).
             const knownEntities = new Set<string>([...Object.keys(rp_entities), ...Object.keys(bp_entities)])
             const knownItems = new Set<string>(Object.keys(bp_items))
-            const knownBlocks = new Set<string>(bp_blocks.keys())
+            const knownBlocks = new Set<string>(Object.keys(bp_blocks))
 
             for (const scriptFile of findScriptFiles(this.scanRoot)) {
                 const content = fs.readFileSync(scriptFile).toString()

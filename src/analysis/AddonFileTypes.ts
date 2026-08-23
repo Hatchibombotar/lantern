@@ -1,3 +1,4 @@
+import { FilePathData } from '../FilePathData';
 
 export enum AddonFileTypes {
 	bp_entity,
@@ -13,7 +14,9 @@ export enum AddonFileTypes {
 	rp_block_culling_rule,
 
 	rp_model,
-	rp_texture
+	rp_texture,
+
+	unknown,
 }
 
 export const file_type_names: Record<AddonFileTypes, string> = {
@@ -30,4 +33,12 @@ export const file_type_names: Record<AddonFileTypes, string> = {
 	[AddonFileTypes.rp_block_culling_rule]: "rp/block_culling",
 	[AddonFileTypes.rp_model]: "rp/models",
 	[AddonFileTypes.rp_texture]: "rp/textures",
+
+	[AddonFileTypes.unknown]: "unknown"
 };
+
+export type ProjectFile = { fileType: AddonFileTypes; path: FilePathData; };
+
+export function getFilesOfType(fileType: AddonFileTypes, files: ProjectFile[]) {
+    return files.filter(x => x.fileType === fileType);
+}

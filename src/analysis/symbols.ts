@@ -2,21 +2,39 @@ import * as vscode from 'vscode';
 import { ParsedProject } from './ParsedProject';
 
 export enum SymbolType {
-    EntityIdentifer,
+    EntityIdentifier,
     BPAnimation,
     BPAnimationController,
     RPAnimation,
     RPAnimationController,
     RPRenderController,
+
+    BlockIdentifier,
+    Geometry,
+    CullingRule,
+    BlockTextureShortname,
+    TexturePath,
+
+    ItemIdentifier,
+    ItemTextureShortname,
 }
 
 const symbolTypeReadableName: Record<SymbolType, string> = {
-    [SymbolType.EntityIdentifer]: "Entity Identifier",
+    [SymbolType.EntityIdentifier]: "Entity Identifier",
     [SymbolType.BPAnimation]: "BP Animation",
     [SymbolType.BPAnimationController]: "BP Animation Controller",
     [SymbolType.RPAnimation]: "RP Animation",
     [SymbolType.RPAnimationController]: "RP Animation Controller",
     [SymbolType.RPRenderController]: "RP Render Controller",
+
+    [SymbolType.BlockIdentifier]: "Block Identifier",
+    [SymbolType.Geometry]: "Geometry",
+    [SymbolType.CullingRule]: "Block Culling Rule",
+    [SymbolType.BlockTextureShortname]: "Block Texture Shortname",
+    [SymbolType.TexturePath]: "Texture Path",
+
+    [SymbolType.ItemIdentifier]: "Item Identifier",
+    [SymbolType.ItemTextureShortname]:  "Item Texture Shortname",
 }
 
 export type SymbolValue = string
@@ -37,7 +55,7 @@ export function getReferencedEntitySymbols(project: ParsedProject, entityId: str
 
     if (bp_entity || rp_entity) {
         symbols.push({
-            type: SymbolType.EntityIdentifer,
+            type: SymbolType.EntityIdentifier,
             value: entityId,
         })
     }
@@ -88,6 +106,112 @@ export function getReferencedEntitySymbols(project: ParsedProject, entityId: str
                 value: rc_name,
             })
         }
+
+        for (const model of rp_entity.models) {
+            symbols.push({
+                type: SymbolType.Geometry,
+                value: model,
+            })
+        }
+    }
+
+    return symbols
+}
+
+export function getReferencedBlockSymbols(project: ParsedProject, identifier: string) {
+    const bp_block = project.bp_blocks[identifier]
+    const symbols: Symbol[] = []
+
+
+    if (bp_block) {
+        for (const culling of bp_block.cullingRules) {
+            symbols.push({
+                type: SymbolType.CullingRule,
+                value: culling,
+            })
+        }
+
+        for (const model of bp_block.models) {
+            symbols.push({
+                type: SymbolType.Geometry,
+                value: model,
+            })
+        }
+
+        for (const shortname of bp_block.textureShortnames) {
+            symbols.push({
+                type: SymbolType.BlockTextureShortname,
+                value: shortname,
+            })
+        }
+
+        for (const texture of bp_block.textures) {
+            symbols.push({
+                type: SymbolType.TexturePath,
+                value: texture,
+            })
+        }
+    }
+
+    return symbols
+}
+
+export function getReferencedItemSymbols(project: ParsedProject, identifier: string) {
+    const bp_item = project.bp_items[identifier]
+    const symbols: Symbol[] = []
+
+    if (bp_item) {
+        // TODO: do something with attachables
+
+        for (const shortname of bp_item.textureShortnames) {
+            symbols.push({
+                type: SymbolType.ItemTextureShortname,
+                value: shortname,
+            })
+        }
+
+        for (const texture of bp_item.textures) {
+            symbols.push({
+                type: SymbolType.TexturePath,
+                value: texture,
+            })
+        }
+    }
+
+    return symbols
+}
+
+export function getIdentifierSymbols(project: ParsedProject): Symbol[] {
+    const symbols: Symbol[] = []
+
+    for (const identifier of Object.keys(project.bp_entity)) {
+        symbols.push({
+            type: SymbolType.EntityIdentifier,
+            value: identifier
+        })
+    }
+    for (const identifier of Object.keys(project.rp_entity)) {
+        // Skip identifiers that exist in the bp.
+        if (symbols.find((v) => v.type === SymbolType.EntityIdentifier && v.value === identifier)) {
+            continue
+        }
+        symbols.push({
+            type: SymbolType.EntityIdentifier,
+            value: identifier
+        })
+    }
+
+    for (const identifier of Object.keys(project.bp_items)) {
+        symbols.push({
+            type: SymbolType.ItemIdentifier,
+            value: identifier
+        })
+    }
+    for (const identifier of Object.keys(project.bp_blocks)) {
+        symbols.push({
+            type: SymbolType.BlockIdentifier,
+            value: identifier
+        })
     }
 
     return symbols

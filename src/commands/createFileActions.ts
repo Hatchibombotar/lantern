@@ -1,18 +1,17 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs/promises';
-import * as nodePath from 'path';
 import * as JSONC from "jsonc-parser"
+import fs from 'fs/promises';
+import nodePath from 'path';
 
-import { AddonFileTypes } from './AddonFileTypes';
-import { getProjectContext } from './analysis/context';
-import { findOrCreateDestinationPath, getFilesOfType, jsoncModifyandEditWithInitialisedParents as jsoncModify, objectModifyWithInitialisedParents, readTemplate } from './utils';
-import { Node, NodeInfo } from './domainViewer/createFolderStructure';
+import { AddonFileTypes, getFilesOfType } from '../analysis/AddonFileTypes';
+import { getProjectContext } from '../analysis/context';
+import { findOrCreateDestinationPath, jsoncModifyandEditWithInitialisedParents as jsoncModify, objectModifyWithInitialisedParents, readTemplate } from '../utils';
+import { Node, NodeInfo } from '../domainViewer/createFolderStructure';
 
-export default function registerAllCommands(context: vscode.ExtensionContext) {
+export default function registerCreateFileActions(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         createEntity(context),
         createItem(context),
-        entityCopyIdentifier(context),
         entityCreateBPEntity(context),
         entityCreateBPAnimation(context),
         entityCreateBPAnimationController(context),
@@ -20,7 +19,6 @@ export default function registerAllCommands(context: vscode.ExtensionContext) {
         entityCreateRPAnimation(context),
         entityCreateRPAnimationController(context),
         entityCreateRPRenderController(context),
-        itemCopyIdentifier(),
         itemCreateBPItem(context),
         itemAttachableCreateRPEntity(context),
         itemAttachableCreateRPAnimation(context),
@@ -125,15 +123,6 @@ function createItem(context: vscode.ExtensionContext) {
         await fs.writeFile(bpEntityDestinationPath, JSON.stringify(template, null, 4))
 
         vscode.window.showInformationMessage(`Successfully created BP item.`)
-    })
-}
-function entityCopyIdentifier(context: vscode.ExtensionContext) {
-    return vscode.commands.registerCommand("bedrockLantern.entityCopyIdentifier", async (element: vscode.TreeItem) => {
-        const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type === "element") {
-            vscode.env.clipboard.writeText(meta.identifier)
-            vscode.window.showInformationMessage(`Copied identifier ${meta.identifier} to clipboard.`)
-        }
     })
 }
 function entityCreateBPEntity(context: vscode.ExtensionContext) {
@@ -810,15 +799,6 @@ function entityCreateRPRenderController(context: vscode.ExtensionContext) {
 
         await fs.writeFile(rpEntityFile.path.exactPath, result)
         vscode.window.showInformationMessage(`Successfully created RP render controller.`)
-    })
-}
-function itemCopyIdentifier() {
-    return vscode.commands.registerCommand("bedrockLantern.itemCopyIdentifier", async (element: vscode.TreeItem) => {
-        const meta = (element as any).__meta as (Node) | undefined;
-        if (meta?.type === "element") {
-            vscode.env.clipboard.writeText(meta.identifier)
-            vscode.window.showInformationMessage(`Copied identifier ${meta.identifier} to clipboard.`)
-        }
     })
 }
 function itemCreateBPItem(context: vscode.ExtensionContext) {

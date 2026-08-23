@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
-import { file_type_names, AddonFileTypes } from '../AddonFileTypes';
+import { file_type_names, AddonFileTypes } from '../analysis/AddonFileTypes';
 import { getProjectContext } from '../analysis/context';
-import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder, ProjectFile, FileFolder } from './createFolderStructure';
+import { Node, isFolder, parseEntitiesInFolder, parseItemsInFolder, Root, NodeInfo, Folder, Category, parseBlocksInFolder, FileFolder } from './createFolderStructure';
+import { ProjectFile } from '../analysis/AddonFileTypes';
 import path from 'path';
 import { ParsedProject, ScriptLink } from '../analysis/ParsedProject';
 
@@ -231,6 +232,8 @@ export class DomainGroupViewer implements vscode.TreeDataProvider<vscode.TreeIte
 			[AddonFileTypes.rp_block_culling_rule]: "rp/block.svg",
 			[AddonFileTypes.rp_model]: "rp/model.svg",
 			[AddonFileTypes.rp_texture]: "rp/image.svg",
+
+			[AddonFileTypes.unknown]: "product/error.svg",
 		};
 
 		const icon = icons[file.fileType];

@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { ParsedProject } from './analysis/ParsedProject';
-import { getProjectContext } from './analysis/context';
-import { DomainGroupViewer } from './domainViewer/DomainGroupViewer';
-import { Category } from './domainViewer/createFolderStructure';
-import { ProjectParser } from './analysis/ProjectParser';
+import { ParsedProject } from '../analysis/ParsedProject';
+import { getProjectContext } from '../analysis/context';
+import { DomainGroupViewer } from '../domainViewer/DomainGroupViewer';
+import { Category } from '../domainViewer/createFolderStructure';
+import { ProjectParser } from '../analysis/ProjectParser';
 
 export default function registerScriptLinkCommands(context: vscode.ExtensionContext, treeView: vscode.TreeView<vscode.TreeItem>, treeDataProvider: DomainGroupViewer) {
 	context.subscriptions.push(
@@ -42,7 +42,7 @@ function knownIdentifierPicks(parsedProject: ParsedProject): vscode.QuickPickIte
 	for (const id of Object.keys(parsedProject.bp_items)) {
 		add(id, "item");
 	}
-	for (const id of parsedProject.bp_blocks.keys()) {
+	for (const id of Object.keys(parsedProject.bp_blocks)) {
 		add(id, "block");
 	}
 	picks.sort((a, b) => a.label.localeCompare(b.label));
@@ -124,7 +124,7 @@ function openLinkedIdentifier(treeView: vscode.TreeView<vscode.TreeItem>, treeDa
 			parsedProject.bp_entity[identifier]?.path ??
 			parsedProject.rp_entity[identifier]?.path ??
 			parsedProject.bp_items[identifier]?.path ??
-			parsedProject.bp_blocks.find(([id]) => identifier === id)[0][1]?.path;
+			parsedProject.bp_blocks[identifier]?.path
 		if (target === undefined) {
 			vscode.window.showWarningMessage(`Lantern: no file found for ${identifier}.`);
 			return;

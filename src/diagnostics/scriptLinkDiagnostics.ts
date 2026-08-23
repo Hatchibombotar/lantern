@@ -67,7 +67,7 @@ function getKnownIdentifiers(): KnownIdentifiers | undefined {
 	return {
 		entities: new Set<string>([...Object.keys(parsedProject.bp_entity), ...Object.keys(parsedProject.rp_entity)]),
 		items: new Set<string>(Object.keys(parsedProject.bp_items)),
-		blocks: new Set<string>(parsedProject.bp_blocks.keys()),
+		blocks: new Set<string>(Object.keys(parsedProject.bp_blocks)),
 	};
 }
 
