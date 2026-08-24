@@ -1,4 +1,3 @@
-import * as vscode from 'vscode';
 import { ParsedProject } from './ParsedProject';
 
 export enum SymbolType {
@@ -215,76 +214,4 @@ export function getIdentifierSymbols(project: ParsedProject): Symbol[] {
     }
 
     return symbols
-}
-
-
-/** Show a VSCODE quick picker that allows a user to rename symbols.
-Returns an array where each item is a tuple containing the original symbol and a renamed value. */
-export async function selectRenamedSymbols(symbols: Symbol[], initialRenamed?: [Symbol, SymbolValue | null][]): Promise<undefined | [Symbol, SymbolValue][]> {
-    interface QuickPickItem extends vscode.QuickPickItem {
-        data?: Symbol
-        index?: number
-    }
-    const renames: [Symbol, SymbolValue | null][] = symbols.map(x => {
-        const alreadyRenamedSymbol = initialRenamed?.find((([y]) => symbolsEqual(x, y)))
-
-        if (alreadyRenamedSymbol !== undefined) {
-            return [x, alreadyRenamedSymbol[1]]
-        }
-        return [x, null]
-    })
-
-    while (true) {
-        const options: QuickPickItem[] = [
-            { label: "Continue" },
-            { label: "symbols", kind: vscode.QuickPickItemKind.Separator },
-        ]
-        for (const [symbolIndex, symbol] of symbols.entries()) {
-            const option: QuickPickItem = {
-                label: renames[symbolIndex][1] ?? symbol.value,
-                data: symbol,
-                index: symbolIndex,
-                description: "",
-                detail: symbolTypeReadableName[symbol.type]
-            }
-
-            if (renames[symbolIndex][1] === null) {
-                option.description = "Unchanged"
-            } else {
-                option.description = `(${symbol.value})`
-            }
-            options.push(option)
-        }
-        const result = await vscode.window.showQuickPick(options, {
-            title: "Rename symbols",
-            ignoreFocusOut: true,
-        })
-        
-        if (result === undefined) {
-            return undefined
-        }
-        
-        if (result.data === undefined) {
-            break
-        }
-        if (result.index === undefined) {
-            break
-        }
-
-        const currentName = renames[result.index][1] ?? result.data.value
-        
-        const newSymbol = await vscode.window.showInputBox({
-            placeHolder: currentName,
-            value: currentName,
-            prompt: `Rename ${result.data.value}`,
-            ignoreFocusOut: true,
-            // TODO: add validation; make sure the names are valid.
-        })
-
-        if (newSymbol !== undefined) {
-            renames[result.index][1] = newSymbol
-        }
-    }
-
-    return renames.filter(rename => rename[1] !== null && rename[0].value !== rename[1]) as [Symbol, SymbolValue][]
 }

@@ -46,6 +46,7 @@ export class ProjectParser {
             bp_blocks: bpBlocks,
             script_links: this.parseScriptLinks(rpEntities, bpEntities, bpItems, bpBlocks),
             errors: [],
+            script_files: this.getScriptFilePaths()
         }
 
         parsedProject.errors = this.errors
@@ -88,6 +89,45 @@ export class ProjectParser {
         }
 
         return files
+    }
+    
+    getScriptFilePaths(): FilePathData[] {
+        const files = fs.globSync(path.join(this.behaviorPackDir, "./scripts/**/*.{ts,js}"))
+
+        const paths: FilePathData[] = files.map(exactPath => 
+            getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, exactPath)
+        )
+
+        return paths
+    }
+
+    public parseScriptEntryPoint(): FilePathData | undefined {
+        const manifestPathBP = path.join(this.behaviorPackDir, "./manifest.json")
+        if (!fs.existsSync(manifestPathBP)) return
+
+        const fileString = fs.readFileSync(manifestPathBP).toString()
+
+        const errors: JSONC.ParseError[] = []
+        const parsedFile = JSONC.parse(fileString, errors)
+        this.addJSONParseErrors(errors, manifestPathBP)
+        
+        for (const module of parsedFile["modules"] ?? []) {
+            if (module["type"] === "script") {
+                if (module["entry"]) {
+                    const relativePath = path.join("scripts/", module["entry"])
+                    const exactPath = path.join(this.behaviorPackDir, relativePath)
+                    const filePathData: FilePathData = {
+                        exactPath,
+                        relativePath,
+                        rootType: "bp"
+                    }
+
+                    return filePathData
+                }
+            }
+        }
+
+        return undefined
     }
 
     private parseRPEntities(): ParsedProject["rp_entity"] {
@@ -618,7 +658,7 @@ export class ProjectParser {
     // TODO: validate when parsing e.g. using zod.
     parseTerrainTextureData(): TerrainTextureAtlas | null {
         const terrainTexturePath = path.join(this.resourcePackDir, "textures/terrain_texture.json")
-        
+
         if (fs.existsSync(terrainTexturePath)) {
             const terrainTextureFile = fs.readFileSync(terrainTexturePath).toString()
             const terrainTexture = JSONC.parse(terrainTextureFile)
@@ -630,7 +670,7 @@ export class ProjectParser {
     }
     parseItemTextureData(): ItemTextureAtlas | null {
         const itemTexturePath = path.join(this.resourcePackDir, "textures/item_texture.json")
-        
+
         if (fs.existsSync(itemTexturePath)) {
             const file = fs.readFileSync(itemTexturePath).toString()
             const parsedFile = JSONC.parse(file)

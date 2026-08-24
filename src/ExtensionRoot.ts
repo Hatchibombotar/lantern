@@ -49,7 +49,7 @@ export default class ExtensionRoot {
 			if (refreshTimer) {
 				clearTimeout(refreshTimer)
 			}
-			refreshTimer = setTimeout(this.refresh, 300)
+			refreshTimer = setTimeout(() => this.refresh(), 300)
 		}
 		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root || '', '**/*'))
 		watcher.onDidCreate(scheduleRefresh)

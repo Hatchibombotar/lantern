@@ -2,18 +2,20 @@ import fs from 'fs/promises';
 import path from 'path';
 import simpleGit from 'simple-git';
 import * as vscode from 'vscode';
-import { createGlobalStorageDirectory } from '../utils';
+import { createGlobalStorageDirectory, showErrorInTextDocument } from '../utils';
 import { globSync } from 'fs';
 import * as JSONC from 'jsonc-parser';
 import { ProjectParser } from '../analysis/ProjectParser';
 import { Importer } from '../importer/Importer';
-import { getIdentifierSymbols, getReferencedBlockSymbols, getReferencedEntitySymbols, getReferencedItemSymbols, selectRenamedSymbols, Symbol, symbolsEqual, SymbolType, SymbolValue } from '../analysis/symbols';
+import { getIdentifierSymbols, getReferencedBlockSymbols, getReferencedEntitySymbols, getReferencedItemSymbols, Symbol, symbolsEqual, SymbolType, SymbolValue } from '../analysis/symbols';
+import { selectRenamedSymbols, showSelectFiles } from '../quickPickUtils';
 import { selectRenameFiles } from '../quickPickUtils';
 import { renameSymbolFromIdentifier } from '../importer/renameSymbols';
 import { getAssetsForBlock, getAssetsForEntity, getAssetsForItem, getFilesForBlock, getFilesForEntity, getFilesForItem } from '../domainViewer/createFolderStructure';
 import { ProjectFile } from '../analysis/AddonFileTypes';
 import { renamePathFromIdentifier } from '../importer/renamePaths';
 import { AddonFileTypes } from '../analysis/AddonFileTypes';
+import { filePathsEqual } from '../FilePathData';
 
 const uuidImport = import("uuid")
 
@@ -197,15 +199,15 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
             switch (identifier.type) {
                 case SymbolType.EntityIdentifier:
                     files = getFilesForEntity(sourceProject, identifier.value)
-                    files.push(...getAssetsForEntity(sourceProject, identifier.value).filter(x=>x.fileType !== AddonFileTypes.rp_texture))
+                    files.push(...getAssetsForEntity(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
                     break
                 case SymbolType.BlockIdentifier:
                     files = getFilesForBlock(sourceProject, sourceProject.bp_blocks[identifier.value])
-                    files.push(...getAssetsForBlock(sourceProject, sourceProject.bp_blocks[identifier.value]).filter(x=>x.fileType !== AddonFileTypes.rp_texture))
+                    files.push(...getAssetsForBlock(sourceProject, sourceProject.bp_blocks[identifier.value]).filter(x => x.fileType !== AddonFileTypes.rp_texture))
                     break
                 case SymbolType.ItemIdentifier:
                     files = getFilesForItem(sourceProject, identifier.value)
-                    files.push(...getAssetsForItem(sourceProject, identifier.value).filter(x=>x.fileType !== AddonFileTypes.rp_texture))
+                    files.push(...getAssetsForItem(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
                     break
                 default:
                     throw Error("Identifier type not handled correctly: " + identifier)
@@ -228,17 +230,48 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
         )
         if (renamedFiles === undefined) return
 
-        // If we wanted to include files not caught by the importer
-        // const allFiles = parser.getAllFiles()
+        let scriptFileCopyToDirName = path.dirname(metaPath).split(path.sep)?.at(-1) ?? "imported"
+        let shouldImportScriptFiles = true
 
-        // if (allKnownFiles.length !== parser.getAllFiles().length) {
-        //     const extraFiles = []
-        //     for (const file of allFiles) {
-        //         if (!allKnownFiles.find((knownFile) => filePathsEqual(knownFile.path, file))) {
-        //             extraFiles.push(file)
-        //         }
-        //     }
-        // }
+        const hasScriptFiles = sourceProject.script_files.length > 0
+
+        if (hasScriptFiles) {
+
+            // Decide what to do with script files
+            while (true) {
+                const result = await vscode.window.showQuickPick([
+                    { id: "import", label: "Import script files" },
+                    { id: "doNotImport", label: "Do not import script files" },
+                    { label: "Options", kind: vscode.QuickPickItemKind.Separator },
+                    { id: "changeCopyToDir", label: "Change folder to copy to", detail: `current: \`bp/scripts/${scriptFileCopyToDirName}/...\`` },
+                ], {
+                    title: "Script File Import Options",
+                })
+
+                if (result === undefined) return
+
+                if (result.id === "import") {
+                    shouldImportScriptFiles = true
+                    break
+                } else if (result.id === "doNotImport") {
+                    shouldImportScriptFiles = false
+                    break
+                } else if (result.id === "changeCopyToDir") {
+                    const newName = await vscode.window.showInputBox({
+                        title: "Change script result directory name",
+                        placeHolder: scriptFileCopyToDirName,
+                        validateInput: (str) => {
+                            if (!str.match(/[a-z\-\_\. ]/)) {
+                                return "invalid dirname. Allowed Characters: a-z, -, _"
+                            }
+                        }
+                    })
+                    if (newName === undefined) continue
+
+                    scriptFileCopyToDirName = newName
+                }
+            }
+        }
 
         const importer = new Importer(
             parser,
@@ -248,8 +281,49 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
 
         console.log(allSymbols)
 
-        await importer.importSymbolsFromProject(allSymbols)
+        try {
+            await importer.importSymbolsFromProject(allSymbols)
 
+            if (hasScriptFiles && shouldImportScriptFiles) {
+                await importer.importScripts(scriptFileCopyToDirName)
+            }
+        } catch (err) {
+            console.error(err)
+
+            showErrorInTextDocument(`# Something went wrong!
+                Please report the error on discord or at https://github.com/Hatchibombotar/lantern/issues
+
+                ## Error
+                ${String(err)}
+
+                ## Stack Trace
+                ${String(Error(err as any ?? "Unknown error")?.stack)}
+
+                ## Debug Info
+                ${JSON.stringify(allSymbols, null, 4)}
+                ${JSON.stringify(sourceProject, null, 4)}
+
+
+                `)
+        }
+
+        // If we wanted to include files not caught by the importer
+        const allFiles = parser.getAllFiles()
+
+        const importedFiles = importer.importedFiles
+
+        if (importedFiles.length !== allFiles.length) {
+            const extraFiles = []
+            for (const file of allFiles) {
+                if (!importedFiles.find((knownFile) => filePathsEqual(knownFile, file))) {
+                    extraFiles.push(file)
+                }
+            }
+
+            const additionalFilesToInclude = await showSelectFiles(extraFiles, { title: "Include untracked files" })
+
+            console.log(additionalFilesToInclude)
+        }
     }
     vscode.commands.registerCommand("bedrockLantern.importSnippet", importSnippet)
 }

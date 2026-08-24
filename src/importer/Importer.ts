@@ -580,6 +580,10 @@ export class Importer {
             assert(shortname.type === SymbolType.BlockTextureShortname)
 
             const textureData = sourceTerrainTexture["texture_data"][shortname.value]
+            if (textureData === undefined) {
+                console.log(`Texture data is undefined for ${shortname?.value}`)
+                continue
+            }
 
             if (Array.isArray(textureData.textures)) {
                 for (const [i, texture] of textureData.textures.entries()) {
@@ -621,11 +625,16 @@ export class Importer {
         await this.overwriteFileInProject(
             destinationFilePath,
             file,
+            getDetailedPathInfo(
+                this.sourceProjectParser.resourcePackDir,
+                this.sourceProjectParser.behaviorPackDir,
+                path.join(this.sourceProjectParser.resourcePackDir, "./textures/terrain_texture.json"),
+            )
         )
     }
     private async importItemTextureAtlas(symbols: Symbol[]) {
-        const sourceTerrainTexture = this.sourceProjectParser.parseItemTextureData()
-        if (!sourceTerrainTexture) return
+        const sourceItemTexture = this.sourceProjectParser.parseItemTextureData()
+        if (!sourceItemTexture) return
 
         const destinationFilePath = getDetailedPathInfo(
             this.destinationProjectContext.resourcePackDir,
@@ -644,7 +653,7 @@ export class Importer {
         for (const shortname of symbols) {
             assert(shortname.type === SymbolType.ItemTextureShortname)
 
-            const textureData = sourceTerrainTexture["texture_data"][shortname.value]
+            const textureData = sourceItemTexture["texture_data"][shortname.value]
 
             if (Array.isArray(textureData.textures)) {
                 for (const [i, texture] of textureData.textures.entries()) {
@@ -676,6 +685,11 @@ export class Importer {
         await this.overwriteFileInProject(
             destinationFilePath,
             file,
+            getDetailedPathInfo(
+                this.sourceProjectParser.resourcePackDir,
+                this.sourceProjectParser.behaviorPackDir,
+                path.join(this.sourceProjectParser.resourcePackDir, "./textures/item_texture.json"),
+            )
         )
     }
 
@@ -702,11 +716,32 @@ export class Importer {
 
                 await this.copyFileToProject(
                     newPath,
-                    textureFile.exactPath
+                    textureFile.exactPath,
+                    textureFile
                 )
             }
         }
+    }
 
+    // TODO: Automatically import source entry point from destination entry point if both exist.
+    public async importScripts(resultDirToCopyTo: string) {
+        const scriptFiles = this.sourceProject.script_files
+
+        const newScriptFile = "scripts/" + resultDirToCopyTo + "/"
+
+        for (const scriptFile of scriptFiles) {
+            const relativeScriptPath = path.relative("scripts", scriptFile.relativePath)
+
+            const newRelativePath = path.join(newScriptFile, relativeScriptPath)
+
+            const resultPath: FilePathData = {
+                rootType: "bp",
+                relativePath: newRelativePath,
+                exactPath: path.join(this.destinationProjectContext.behaviorPackDir, newRelativePath)
+            }
+
+            await this.copyFileToProject(resultPath, scriptFile.exactPath, scriptFile)
+        }
     }
 
     private getRenamedSymbolValue(
@@ -788,7 +823,7 @@ export class Importer {
         }
     }
 
-    private async copyFileToProject(destinationPath: FilePathData, sourcePath: string) {
+    private async copyFileToProject(destinationPath: FilePathData, sourcePath: string, sourceFilePath?: FilePathData) {
         const { resourcePackDir, behaviorPackDir } = this.destinationProjectContext
         if (existsSync(destinationPath.exactPath)) {
             throw Error("File already exists. Path: " + destinationPath.exactPath)
@@ -804,6 +839,10 @@ export class Importer {
         }
 
         await fs.copyFile(sourcePath, destinationPath.exactPath)
+
+        if (sourceFilePath) {
+            this.importedFiles.push(sourceFilePath)
+        }
     }
 
 }

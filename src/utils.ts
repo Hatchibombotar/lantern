@@ -133,3 +133,17 @@ export async function createGlobalStorageDirectory(context: vscode.ExtensionCont
 
     return path
 }
+
+export async function showErrorInTextDocument(content: string) {
+    const action = await vscode.window.showErrorMessage("An error occured while importing. Please report it!",
+        "Report Error"
+    )
+
+    if (action === "Report Error") {
+        const doc = await vscode.workspace.openTextDocument({
+            language: "markdown",
+            content: content
+        });
+        await vscode.window.showTextDocument(doc);
+    }
+}

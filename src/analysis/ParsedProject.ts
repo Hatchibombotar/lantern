@@ -60,6 +60,8 @@ export type ParsedProject = {
 
 	"script_links": ScriptLink[];
 
+	"script_files": FilePathData[]
+
 	errors: ProjectParseError[]
 };
 
