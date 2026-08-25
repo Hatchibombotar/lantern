@@ -117,6 +117,9 @@ export class Importer {
             for (const symbol of symbolsToImportByType[SymbolType.BlockIdentifier]) {
                 await this.importBlock(symbol)
             }
+            await this.importBlocksDotJson(
+                symbolsToImportByType[SymbolType.BlockIdentifier]
+            )
         }
 
         if (symbolsToImportByType[SymbolType.CullingRule]) {
@@ -692,6 +695,82 @@ export class Importer {
             )
         )
     }
+
+
+    private async importBlocksDotJson(symbols: Symbol[]) {
+        const sourceBlocksDotJson = this.sourceProjectParser.parseBlocksDotJSONData()
+        if (!sourceBlocksDotJson) return
+
+        const destinationFilePath = getDetailedPathInfo(
+            this.destinationProjectContext.resourcePackDir,
+            this.destinationProjectContext.behaviorPackDir,
+            path.join(this.destinationProjectContext.resourcePackDir, "./blocks.json"),
+        )
+
+        let file!: string
+
+        if (existsSync(destinationFilePath.exactPath)) {
+            file = (await fs.readFile(destinationFilePath.exactPath)).toString()
+        } else {
+            file = itemTextureBase
+        }
+
+        for (const identifier of symbols) {
+            assert(identifier.type === SymbolType.BlockIdentifier)
+
+            const blockData = sourceBlocksDotJson[identifier.value]
+            if (!blockData) continue
+
+            if (typeof blockData.textures === "string") {
+                blockData.textures = this.getRenamedSymbolValue({
+                    type: SymbolType.BlockTextureShortname,
+                    value: blockData.textures
+                })
+            } else if (blockData.textures) {
+                for (const [part, texture] of Object.keys(blockData.textures)) {
+                    assert(typeof texture === "string")
+                    blockData.textures[part] = this.getRenamedSymbolValue({
+                        type: SymbolType.BlockTextureShortname,
+                        value: texture
+                    })
+                }
+            }
+
+            if (typeof blockData.carried_textures === "string") {
+                blockData.carried_textures = this.getRenamedSymbolValue({
+                    type: SymbolType.BlockTextureShortname,
+                    value: blockData.carried_textures
+                })
+            } else if (blockData.carried_textures) {
+                for (const [part, texture] of Object.keys(blockData.carried_textures)) {
+                    assert(typeof texture === "string")
+                    blockData.carried_textures[part] = this.getRenamedSymbolValue({
+                        type: SymbolType.BlockTextureShortname,
+                        value: texture
+                    })
+                }
+            }
+
+            const newIdentifier = this.getRenamedSymbolValue(identifier)
+
+            file = jsoncModifyandEditWithInitialisedParents(
+                file,
+                [newIdentifier],
+                blockData
+            )
+        }
+
+        await this.overwriteFileInProject(
+            destinationFilePath,
+            file,
+            getDetailedPathInfo(
+                this.sourceProjectParser.resourcePackDir,
+                this.sourceProjectParser.behaviorPackDir,
+                path.join(this.sourceProjectParser.resourcePackDir, "./blocks.json"),
+            )
+        )
+    }
+
 
     private async importTextures(symbols: Symbol[]) {
         for (const texture of symbols) {

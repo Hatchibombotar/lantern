@@ -129,19 +129,22 @@ export async function selectRenameFiles(files: ProjectFile[], initialRenamed?: [
     return renames;
 }
 
-export async function showSelectFiles(files: FilePathData[], options: vscode.QuickPickOptions = {}): Promise<vscode.QuickPickItem[] | undefined> {
+export async function showSelectFiles(files: FilePathData[], options: vscode.QuickPickOptions = {}): Promise<FilePathData[] | undefined> {
     const result = await vscode.window.showQuickPick(
         files.map(file => ({
             label: file.rootType + path.sep + file.relativePath,
             picked: false,
-        })) as vscode.QuickPickItem[],
+            file
+        })),
         {
             ...options,
             canPickMany: true,
         }
     )
 
-    return result
+    if (result === undefined) return
+
+    return result?.map(x => x.file)
 }
 
 

@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import * as JSONC from "jsonc-parser"
-import { ItemTextureAtlas, ParsedProject, ScriptLink, TerrainTextureAtlas } from './ParsedProject';
+import { BlocksDotJSON, ItemTextureAtlas, ParsedProject, ScriptLink, TerrainTextureAtlas } from './ParsedProject';
 import { ProjectParseError } from "./ParsedProject";
 import { FilePathData, getDetailedPathInfo } from '../FilePathData';
 import { SymbolValue } from './symbols';
@@ -673,6 +673,18 @@ export class ProjectParser {
 
         if (fs.existsSync(itemTexturePath)) {
             const file = fs.readFileSync(itemTexturePath).toString()
+            const parsedFile = JSONC.parse(file)
+
+            return parsedFile
+        } else {
+            return null
+        }
+    }
+    parseBlocksDotJSONData(): BlocksDotJSON | null {
+        const blocksDotJsonPath = path.join(this.resourcePackDir, "blocks.json")
+
+        if (fs.existsSync(blocksDotJsonPath)) {
+            const file = fs.readFileSync(blocksDotJsonPath).toString()
             const parsedFile = JSONC.parse(file)
 
             return parsedFile

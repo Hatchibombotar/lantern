@@ -151,84 +151,120 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
 
         const identifiers = getIdentifierSymbols(sourceProject)
 
-        const newIdentifiers = await selectRenamedSymbols(identifiers)
-        if (newIdentifiers === undefined) return
+        let importer!: Importer;
 
-        const initialRenamedSymbols: [Symbol, SymbolValue][] = [...newIdentifiers]
-        const allSymbols: Symbol[] = [...identifiers]
+        if (identifiers.length > 0) {
+            const newIdentifiers = await selectRenamedSymbols(identifiers)
+            if (newIdentifiers === undefined) return
 
-        for (const identifier of identifiers) {
-            let symbols!: Symbol[]
+            const initialRenamedSymbols: [Symbol, SymbolValue][] = [...newIdentifiers]
+            const allSymbols: Symbol[] = [...identifiers]
 
-            switch (identifier.type) {
-                case SymbolType.EntityIdentifier:
-                    symbols = getReferencedEntitySymbols(sourceProject, identifier.value)
-                    break
-                case SymbolType.BlockIdentifier:
-                    symbols = getReferencedBlockSymbols(sourceProject, identifier.value)
-                    break
-                case SymbolType.ItemIdentifier:
-                    symbols = getReferencedItemSymbols(sourceProject, identifier.value)
-                    break
-                default:
-                    throw Error("Identifier type not handled correctly: " + identifier)
+            for (const identifier of identifiers) {
+                let symbols!: Symbol[]
+
+                switch (identifier.type) {
+                    case SymbolType.EntityIdentifier:
+                        symbols = getReferencedEntitySymbols(sourceProject, identifier.value)
+                        break
+                    case SymbolType.BlockIdentifier:
+                        symbols = getReferencedBlockSymbols(sourceProject, identifier.value)
+                        break
+                    case SymbolType.ItemIdentifier:
+                        symbols = getReferencedItemSymbols(sourceProject, identifier.value)
+                        break
+                    default:
+                        throw Error("Identifier type not handled correctly: " + identifier)
+                }
+
+                const newIdentifier = newIdentifiers.find(([k]) => symbolsEqual(k, identifier))?.[1] ?? identifier.value
+
+                for (const symbol of symbols) {
+                    const newValue = renameSymbolFromIdentifier(symbol, identifier.value, newIdentifier)
+                    initialRenamedSymbols.push(
+                        [symbol, newValue]
+                    )
+                    allSymbols.push(symbol)
+                }
             }
 
-            const newIdentifier = newIdentifiers.find(([k]) => symbolsEqual(k, identifier))?.[1] ?? identifier.value
+            const renamedSymbols = await selectRenamedSymbols(allSymbols, initialRenamedSymbols)
+            if (renamedSymbols === undefined) return
 
-            for (const symbol of symbols) {
-                const newValue = renameSymbolFromIdentifier(symbol, identifier.value, newIdentifier)
-                initialRenamedSymbols.push(
-                    [symbol, newValue]
+            const initialRenamedFiles: [ProjectFile, string][] = []
+
+            const allKnownFiles: ProjectFile[] = []
+
+            for (const identifier of identifiers) {
+                let files!: ProjectFile[]
+                const newIdentifier = newIdentifiers.find(([k]) => symbolsEqual(k, identifier))?.[1] ?? identifier.value
+
+                switch (identifier.type) {
+                    case SymbolType.EntityIdentifier:
+                        files = getFilesForEntity(sourceProject, identifier.value)
+                        files.push(...getAssetsForEntity(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
+                        break
+                    case SymbolType.BlockIdentifier:
+                        files = getFilesForBlock(sourceProject, sourceProject.bp_blocks[identifier.value])
+                        files.push(...getAssetsForBlock(sourceProject, sourceProject.bp_blocks[identifier.value]).filter(x => x.fileType !== AddonFileTypes.rp_texture))
+                        break
+                    case SymbolType.ItemIdentifier:
+                        files = getFilesForItem(sourceProject, identifier.value)
+                        files.push(...getAssetsForItem(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
+                        break
+                    default:
+                        throw Error("Identifier type not handled correctly: " + identifier)
+                }
+
+                for (const file of files) {
+                    const newPath = renamePathFromIdentifier(file, identifier.value, newIdentifier)
+                    initialRenamedFiles.push([
+                        file, newPath
+                    ])
+
+                    allKnownFiles.push(file)
+                }
+            }
+
+            // TODO: Show all files using parser.getAllFiles()
+            const renamedFiles = await selectRenameFiles(
+                allKnownFiles,
+                initialRenamedFiles
+            )
+            if (renamedFiles === undefined) return
+
+            importer = new Importer(
+                parser,
+                renamedSymbols,
+                renamedFiles.map(([file, newPath]) => [file.path, newPath]),
+            )
+
+            console.log(allSymbols)
+
+            try {
+                await importer.importSymbolsFromProject(allSymbols)
+            } catch (err) {
+                console.error(err)
+
+                showErrorInTextDocument(
+                    `# Something went wrong!
+Please report the error on discord or at https://github.com/Hatchibombotar/lantern/issues
+
+## Error
+${String(err)}
+
+## Stack Trace
+${String(Error(err as any ?? "Unknown error")?.stack)}
+`
                 )
-                allSymbols.push(symbol)
             }
+        } else {
+            importer = new Importer(
+                parser,
+                [],
+                []
+            )
         }
-
-        const renamedSymbols = await selectRenamedSymbols(allSymbols, initialRenamedSymbols)
-        if (renamedSymbols === undefined) return
-
-        const initialRenamedFiles: [ProjectFile, string][] = []
-
-        const allKnownFiles: ProjectFile[] = []
-
-        for (const identifier of identifiers) {
-            let files!: ProjectFile[]
-            const newIdentifier = newIdentifiers.find(([k]) => symbolsEqual(k, identifier))?.[1] ?? identifier.value
-
-            switch (identifier.type) {
-                case SymbolType.EntityIdentifier:
-                    files = getFilesForEntity(sourceProject, identifier.value)
-                    files.push(...getAssetsForEntity(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
-                    break
-                case SymbolType.BlockIdentifier:
-                    files = getFilesForBlock(sourceProject, sourceProject.bp_blocks[identifier.value])
-                    files.push(...getAssetsForBlock(sourceProject, sourceProject.bp_blocks[identifier.value]).filter(x => x.fileType !== AddonFileTypes.rp_texture))
-                    break
-                case SymbolType.ItemIdentifier:
-                    files = getFilesForItem(sourceProject, identifier.value)
-                    files.push(...getAssetsForItem(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
-                    break
-                default:
-                    throw Error("Identifier type not handled correctly: " + identifier)
-            }
-
-            for (const file of files) {
-                const newPath = renamePathFromIdentifier(file, identifier.value, newIdentifier)
-                initialRenamedFiles.push([
-                    file, newPath
-                ])
-
-                allKnownFiles.push(file)
-            }
-        }
-
-        // TODO: Show all files using parser.getAllFiles()
-        const renamedFiles = await selectRenameFiles(
-            allKnownFiles,
-            initialRenamedFiles
-        )
-        if (renamedFiles === undefined) return
 
         let scriptFileCopyToDirName = path.dirname(metaPath).split(path.sep)?.at(-1) ?? "imported"
         let shouldImportScriptFiles = true
@@ -236,7 +272,6 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
         const hasScriptFiles = sourceProject.script_files.length > 0
 
         if (hasScriptFiles) {
-
             // Decide what to do with script files
             while (true) {
                 const result = await vscode.window.showQuickPick([
@@ -273,39 +308,11 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
             }
         }
 
-        const importer = new Importer(
-            parser,
-            renamedSymbols,
-            renamedFiles.map(([file, newPath]) => [file.path, newPath]),
-        )
 
-        console.log(allSymbols)
-
-        try {
-            await importer.importSymbolsFromProject(allSymbols)
-
-            if (hasScriptFiles && shouldImportScriptFiles) {
-                await importer.importScripts(scriptFileCopyToDirName)
-            }
-        } catch (err) {
-            console.error(err)
-
-            showErrorInTextDocument(`# Something went wrong!
-                Please report the error on discord or at https://github.com/Hatchibombotar/lantern/issues
-
-                ## Error
-                ${String(err)}
-
-                ## Stack Trace
-                ${String(Error(err as any ?? "Unknown error")?.stack)}
-
-                ## Debug Info
-                ${JSON.stringify(allSymbols, null, 4)}
-                ${JSON.stringify(sourceProject, null, 4)}
-
-
-                `)
+        if (hasScriptFiles && shouldImportScriptFiles) {
+            await importer.importScripts(scriptFileCopyToDirName)
         }
+
 
         // If we wanted to include files not caught by the importer
         const allFiles = parser.getAllFiles()
@@ -313,16 +320,28 @@ export default function registerSnippetSourceCommands(context: vscode.ExtensionC
         const importedFiles = importer.importedFiles
 
         if (importedFiles.length !== allFiles.length) {
+            const ignoreFiles: string[] = [
+                "manifest.json",
+                "pack_icon.png"
+            ]
+
+
             const extraFiles = []
             for (const file of allFiles) {
                 if (!importedFiles.find((knownFile) => filePathsEqual(knownFile, file))) {
-                    extraFiles.push(file)
+                    if (!ignoreFiles.includes(file.relativePath)) {
+                        extraFiles.push(file)
+                    }
                 }
             }
 
-            const additionalFilesToInclude = await showSelectFiles(extraFiles, { title: "Include untracked files" })
+            if (extraFiles.length > 0) {
+                const additionalFilesToInclude = await showSelectFiles(extraFiles, { title: "Include untracked files" })
 
-            console.log(additionalFilesToInclude)
+                if (additionalFilesToInclude === undefined) {
+                    return
+                }
+            }
         }
     }
     vscode.commands.registerCommand("bedrockLantern.importSnippet", importSnippet)
@@ -342,7 +361,6 @@ async function deleteSnippetSourceRepo(context: vscode.ExtensionContext, uuid: s
         recursive: true,
     })
 }
-
 
 async function downloadSnippetSourceRepo(context: vscode.ExtensionContext, uuid: string, url: string) {
     const resultPath = await getPathForSnippet(context, uuid)
@@ -373,7 +391,6 @@ async function downloadSnippetSourceRepo(context: vscode.ExtensionContext, uuid:
         }
     )
 }
-
 
 type SnippetSourceDefinition = {
     version: 0,

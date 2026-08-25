@@ -96,8 +96,8 @@ export type TerrainTextureAtlas = {
 	"texture_data": Record<string,
 		{ "textures": string } |
 		{ "textures": string[] } |
-		{ "textures": {path: string, overlay_color: string} } |
-		{ "textures": {path: string, overlay_color: string}[] }
+		{ "textures": { path: string, overlay_color: string } } |
+		{ "textures": { path: string, overlay_color: string }[] }
 	>
 }
 
@@ -108,4 +108,12 @@ export type ItemTextureAtlas = {
 		{ "textures": string } |
 		{ "textures": string[] }
 	>
+}
+export type BlocksDotJSON = {
+	// "format_version": "1.21.40",
+	[key: string]: {
+		sound?: string,
+		textures?: string | Record<string, string>,
+		carried_textures?: string | Record<string, string>,
+	}
 }
