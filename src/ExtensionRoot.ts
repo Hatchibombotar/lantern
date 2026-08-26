@@ -9,9 +9,10 @@ import { getProjectContext } from './analysis/context';
 import { ProjectParser } from './analysis/ProjectParser';
 import { ParsedProject } from './analysis/ParsedProject';
 import { registerProjectParseDiagnostics } from './diagnostics/projectParseDiagnostics';
-import registerSnippetSourceCommands from './commands/importFromRepo';
 import registerEditActions from './commands/editActions';
 import { registerGoToCommand } from './commands/goTo';
+
+import registerSnippetRepoUI from "./commands/snippetRepoUI"
 
 export default class ExtensionRoot {
 	parsedProject: ParsedProject | undefined
@@ -68,10 +69,10 @@ export default class ExtensionRoot {
 		registerEditActions(extensionContext)
 		registerVanillaDataCommands(extensionContext)
 		registerScriptLinkCommands(extensionContext, this.treeView as vscode.TreeView<vscode.TreeItem>, this.domainGroupViewer)
-		registerSnippetSourceCommands(extensionContext)
 		registerScriptLinkDiagnostics(extensionContext)
 
 		registerGoToCommand(extensionContext, this)
+		registerSnippetRepoUI(extensionContext)
 	}
 
 	private refresh() {

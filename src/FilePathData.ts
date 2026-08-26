@@ -11,6 +11,8 @@ export type FilePathData = {
 };
 
 export function filePathsEqual(a: FilePathData, b: FilePathData) {
+	if (a === undefined) return false
+	if (b === undefined) return false
 	return a.exactPath === b.exactPath;
 }
 

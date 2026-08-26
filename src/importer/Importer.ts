@@ -40,6 +40,8 @@ export class Importer {
         }
 
         this.destinationProjectContext = projectContext
+
+        this.fileWriteQueue = []
     }
 
     async importSymbolsFromProject(symbolsToImport: Symbol[]) {
@@ -165,20 +167,25 @@ export class Importer {
     // Groups symbols defined in the same file
     // ParsedProject[parsedProjectKey]
     // Note: this will only work if the value is exactly the FilePathData.
+    // TODO: This is a bit dodgy. Fix if possible.
     groupSymbolsByFile(parsedProjectKey: keyof ParsedProject, symbols: Symbol[]): [FilePathData, Symbol[]][] {
         if (this.sourceProject[parsedProjectKey] === undefined) {
             throw Error("Key does not exist within this.parsedProject.")
         }
-        const animationFilesToImport: [FilePathData, Symbol[]][] = []
+        const filesToImport: [FilePathData, Symbol[]][] = []
         for (const symbol of symbols) {
 
-            const file = (this.sourceProject[parsedProjectKey] as any)[symbol.value] as FilePathData
-            const data = animationFilesToImport.find(([x]) => filePathsEqual(file, x))
+            const file = (this.sourceProject[parsedProjectKey] as any)[symbol.value]
+            if (file === undefined) {
+                console.error("File does not exist for symbol " + symbol.value)
+                continue
+            }
+            const data = filesToImport.find(([x]) => filePathsEqual(file, x) ?? filePathsEqual(file.path, x))
 
             if (data) {
                 data[1].push(symbol)
             } else {
-                animationFilesToImport.push(
+                filesToImport.push(
                     [
                         file, [symbol]
                     ]
@@ -186,7 +193,7 @@ export class Importer {
             }
         }
 
-        return animationFilesToImport
+        return filesToImport
     }
 
     async importEntity(
@@ -712,7 +719,7 @@ export class Importer {
         if (existsSync(destinationFilePath.exactPath)) {
             file = (await fs.readFile(destinationFilePath.exactPath)).toString()
         } else {
-            file = itemTextureBase
+            file = blocksJsonBase
         }
 
         for (const identifier of symbols) {
@@ -852,6 +859,8 @@ export class Importer {
         return destinationFilePath
     }
 
+    fileWriteQueue: (() => Promise<void>)[]
+
     /**
      * Saves a file in the new project. (Does not allow overwriting)
      * @param sourceFilePath The original path of a file imported from the source project,
@@ -875,7 +884,9 @@ export class Importer {
             throw Error("File is not contained within project. Path: " + filePath.exactPath)
         }
 
-        await fs.writeFile(filePath.exactPath, content)
+        this.fileWriteQueue.push(
+            async () => await fs.writeFile(filePath.exactPath, content)
+        )
 
         if (sourceFilePath) {
             this.importedFiles.push(sourceFilePath)
@@ -895,7 +906,9 @@ export class Importer {
             throw Error("File is not contained within project. Path: " + filePath.exactPath)
         }
 
-        await fs.writeFile(filePath.exactPath, content)
+        this.fileWriteQueue.push(
+            async () => await fs.writeFile(filePath.exactPath, content)
+        )
 
         if (sourceFilePath) {
             this.importedFiles.push(sourceFilePath)
@@ -917,10 +930,18 @@ export class Importer {
             throw Error("File is not contained within project. Path: " + destinationPath.exactPath)
         }
 
-        await fs.copyFile(sourcePath, destinationPath.exactPath)
+        this.fileWriteQueue.push(
+            async () => await fs.copyFile(sourcePath, destinationPath.exactPath)
+        )
 
         if (sourceFilePath) {
             this.importedFiles.push(sourceFilePath)
+        }
+    }
+
+    public async applyFileChanges() {
+        for (const fileWrite of this.fileWriteQueue) {
+            await fileWrite()
         }
     }
 
@@ -939,4 +960,7 @@ const itemTextureBase = `{
   "texture_name": "atlas.items",
   "texture_data": {
   }
+}`
+const blocksJsonBase = `{
+   "format_version" : "1.21.40"
 }`

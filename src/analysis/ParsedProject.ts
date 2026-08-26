@@ -6,8 +6,6 @@ import { SymbolValue } from './symbols';
 // TODO: consider making all values arrays to account for duplicates
 
 export type ParsedProject = {
-	resourcePackDir: string;
-	behaviorPackDir: string;
 
 	// RP
 	"rp_entity": Record<SymbolValue, {

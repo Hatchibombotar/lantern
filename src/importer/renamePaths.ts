@@ -57,3 +57,21 @@ export function renamePathFromIdentifier(projectFile: ProjectFile, oldIdentifier
     //     }
     // }
 }
+
+
+export function renamePathFromNewSymbolValue(projectFile: ProjectFile, oldSymbolValue: string, newSymbolValue: string) {
+    const { dir, base } = path.parse(projectFile.path.relativePath)
+
+    const originalName = oldSymbolValue.split(":")[1]
+    const newName = newSymbolValue.split(":")[1]
+
+    const splitBase = base.split(".")
+    if (splitBase[0] === originalName) {
+        splitBase[0] = newName
+    }
+
+    const newFileBase = splitBase.join(".")
+    
+    const newPath = path.join(dir, newFileBase)
+    return newPath
+}

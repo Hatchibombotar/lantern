@@ -134,7 +134,21 @@ export async function createGlobalStorageDirectory(context: vscode.ExtensionCont
     return path
 }
 
-export async function showErrorInTextDocument(content: string) {
+export async function showErrorInTextDocument(err: unknown) {
+    const stack = Error(err as any ?? "Unknown error")?.stack
+    const content = `# Something went wrong!
+    Please report the error on discord or at https://github.com/Hatchibombotar/lantern/issues
+    
+    ## Error
+    ${String(err)}
+    
+    ## Stack Trace
+    ${String(stack)}
+    `
+
+    console.error(err)
+    console.error(stack)
+
     const action = await vscode.window.showErrorMessage("An error occured while importing. Please report it!",
         "Report Error"
     )

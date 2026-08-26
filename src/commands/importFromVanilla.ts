@@ -5,7 +5,6 @@ import { simpleGit, SimpleGitProgressEvent } from 'simple-git';
 import { createGlobalStorageDirectory } from '../utils';
 import { existsSync } from 'fs';
 import { AddonFileTypes } from '../analysis/AddonFileTypes';
-import { ParsedProject } from '../analysis/ParsedProject';
 import { Node } from '../domainViewer/createFolderStructure';
 import { ProjectFile } from '../analysis/AddonFileTypes';
 import { getFilesForEntity } from '../domainViewer/createFolderStructure';
@@ -145,7 +144,7 @@ async function importEntityFromProject(projectParser: ProjectParser, folderPath?
         )
     }
 
-    const renamedSymbols = await selectRenamedSymbols(symbols, initialRenamedSymbols)
+    const renamedSymbols = await selectRenamedSymbols(symbols, {}, initialRenamedSymbols)
     if (renamedSymbols === undefined) return
 
     const files = getFilesForEntity(sourceProject, entityId)

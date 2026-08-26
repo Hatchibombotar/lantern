@@ -15,6 +15,15 @@ In the below picture, it shows all files linked to the zombie in the vanilla pac
 
 ![Example](./images/preview-2.png)
 
+### Import from Snippet Repository
+Lantern has a smart import feature that allows you to import files from repositories. It renames imported files, their identifiers, and references to save you time.
+
+To use this, click on the package icon in the lantern menu or run `Lantern: Open Snippet Repository UI` from the command pallete.
+
+To begin with, you must add a source for your snippets. Press the plus button on the top of the UI that is now open.
+
+The repository `https://github.com/Bedrock-OSS/bedrock-examples` is a collection of examples created by Bedrock-OSS. Paste the link into the vscode dialogue to add it.
+
 ### Import from Vanilla Packs
 If you right click on a directory in the entity section of the grouped files panel you can select `Import Entity from Vanilla`. A UI will come up which allows you to rename the identifier and files linked to the entity.
 

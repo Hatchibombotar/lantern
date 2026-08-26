@@ -150,7 +150,7 @@ export async function showSelectFiles(files: FilePathData[], options: vscode.Qui
 
 /** Show a VSCODE quick picker that allows a user to rename symbols.
 Returns an array where each item is a tuple containing the original symbol and a renamed value. */
-export async function selectRenamedSymbols(symbols: Symbol[], initialRenamed?: [Symbol, SymbolValue | null][]): Promise<undefined | [Symbol, SymbolValue][]> {
+export async function selectRenamedSymbols(symbols: Symbol[], quickPickOptions: vscode.QuickPickOptions = {}, initialRenamed?: [Symbol, SymbolValue | null][]): Promise<undefined | [Symbol, SymbolValue][]> {
     interface QuickPickItem extends vscode.QuickPickItem {
         data?: Symbol;
         index?: number;
@@ -188,6 +188,7 @@ export async function selectRenamedSymbols(symbols: Symbol[], initialRenamed?: [
         const result = await vscode.window.showQuickPick(options, {
             title: "Rename symbols",
             ignoreFocusOut: true,
+            ...quickPickOptions,
         });
 
         if (result === undefined) {

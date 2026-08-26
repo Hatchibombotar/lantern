@@ -33,7 +33,7 @@ export const symbolTypeReadableName: Record<SymbolType, string> = {
     [SymbolType.TexturePath]: "Texture Path",
 
     [SymbolType.ItemIdentifier]: "Item Identifier",
-    [SymbolType.ItemTextureShortname]:  "Item Texture Shortname",
+    [SymbolType.ItemTextureShortname]: "Item Texture Shortname",
 }
 
 export type SymbolValue = string
@@ -43,7 +43,7 @@ export type Symbol = {
     value: SymbolValue,
 }
 
-export function symbolsEqual(x: Symbol, y:Symbol) {
+export function symbolsEqual(x: Symbol, y: Symbol) {
     return x.type === y.type && x.value === y.value
 }
 
@@ -214,4 +214,20 @@ export function getIdentifierSymbols(project: ParsedProject): Symbol[] {
     }
 
     return symbols
+}
+
+export function getSymbolsLinkedByIdentifier(project: ParsedProject, identifier: Symbol) {
+    switch (identifier.type) {
+        case SymbolType.EntityIdentifier:
+            return getReferencedEntitySymbols(project, identifier.value)
+            break
+        case SymbolType.BlockIdentifier:
+            return getReferencedBlockSymbols(project, identifier.value)
+            break
+        case SymbolType.ItemIdentifier:
+            return getReferencedItemSymbols(project, identifier.value)
+            break
+        default:
+            throw Error("Identifier type not handled correctly: " + identifier)
+    }
 }

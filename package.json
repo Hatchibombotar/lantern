@@ -154,18 +154,8 @@
         "category": "Lantern"
       },
       {
-        "command": "bedrockLantern.addSnippetSource",
-        "title": "Add new snippet repository",
-        "category": "Lantern"
-      },
-      {
-        "command": "bedrockLantern.deleteSnippetSources",
-        "title": "Delete snippet repositories",
-        "category": "Lantern"
-      },
-      {
-        "command": "bedrockLantern.importSnippet",
-        "title": "Import Snippet from Repository",
+        "command": "bedrockLantern.showSnippetRepoUI",
+        "title": "Open Snippet Repository UI",
         "category": "Lantern",
         "icon": "$(package)"
       },
@@ -190,7 +180,7 @@
           "group": "navigation"
         },
         {
-          "command": "bedrockLantern.importSnippet",
+          "command": "bedrockLantern.showSnippetRepoUI",
           "when": "view == bedrockLantern",
           "group": "navigation"
         }

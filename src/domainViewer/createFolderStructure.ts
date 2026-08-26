@@ -472,6 +472,157 @@ export function getFilesForBlock(parsedProject: ParsedProject, block: ParsedProj
 	return files
 }
 
+export function getDefinitionFileForSymbol(parsedProject: ParsedProject, symbol: Symbol): ProjectFile[] {
+	const files: ProjectFile[] = []
+	
+	switch (symbol.type) {
+		case SymbolType.EntityIdentifier:
+			const bp_entity = parsedProject.bp_entity[symbol.value]
+			const rp_entity = parsedProject.rp_entity[symbol.value]
+			if (bp_entity) {
+				files.push({
+					fileType: AddonFileTypes.bp_entity,
+					path: bp_entity.path
+				})
+			}
+			if (rp_entity) {
+				files.push({
+					fileType: AddonFileTypes.rp_entity,
+					path: rp_entity.path
+				})
+			}
+			break;
+
+		case SymbolType.BPAnimation:
+			const bp_anim = parsedProject.bp_anims[symbol.value]
+			if (bp_anim) {
+				files.push({
+					fileType: AddonFileTypes.bp_animation,
+					path: bp_anim
+				})
+			}
+			break;
+
+		case SymbolType.RPAnimation:
+			const rp_anim = parsedProject.rp_anims[symbol.value]
+			if (rp_anim) {
+				files.push({
+					fileType: AddonFileTypes.rp_animation,
+					path: rp_anim
+				})
+			}
+			break;
+
+		case SymbolType.BPAnimationController:
+			const bp_anim_controller = parsedProject.bp_animation_controllers[symbol.value]
+			if (bp_anim_controller) {
+				files.push({
+					fileType: AddonFileTypes.bp_animation_controllers,
+					path: bp_anim_controller
+				})
+			}
+			break;
+
+		case SymbolType.RPAnimationController:
+			const rp_anim_controller = parsedProject.rp_animation_controllers[symbol.value]
+			if (rp_anim_controller) {
+				files.push({
+					fileType: AddonFileTypes.rp_animation_controllers,
+					path: rp_anim_controller
+				})
+			}
+			break;
+
+		case SymbolType.RPRenderController:
+			const render_controller = parsedProject.rp_render_controllers[symbol.value]
+			if (render_controller) {
+				files.push({
+					fileType: AddonFileTypes.rp_render_controllers,
+					path: render_controller
+				})
+			}
+			break;
+
+		case SymbolType.BlockIdentifier:
+			const block = parsedProject.bp_blocks[symbol.value]
+			if (block) {
+				files.push({
+					fileType: AddonFileTypes.bp_block,
+					path: block.path
+				})
+			}
+			break;
+
+		case SymbolType.Geometry:
+			const model = parsedProject.rp_models[symbol.value]
+			if (model) {
+				files.push({
+					fileType: AddonFileTypes.rp_model,
+					path: model
+				})
+			}
+			break;
+
+		case SymbolType.CullingRule:
+			const block_culling_rule = parsedProject.rp_block_culling_rules[symbol.value]
+			if (block_culling_rule) {
+				files.push({
+					fileType: AddonFileTypes.rp_block_culling_rule,
+					path: block_culling_rule
+				})
+			}
+			break;
+
+		case SymbolType.BlockTextureShortname:
+			const block_with_shortname = parsedProject.bp_blocks[symbol.value]
+			if (block_with_shortname) {
+				files.push({
+					fileType: AddonFileTypes.bp_block,
+					path: block_with_shortname.path
+				})
+			}
+			break;
+
+		case SymbolType.TexturePath:
+			const texture_entry = parsedProject.rp_textures[symbol.value]
+			if (texture_entry) {
+				texture_entry.files.forEach(file => {
+					files.push({
+						fileType: AddonFileTypes.rp_texture,
+						path: file
+					})
+				})
+			}
+			break;
+
+		case SymbolType.ItemIdentifier:
+			const item = parsedProject.bp_items[symbol.value]
+			if (item) {
+				files.push({
+					fileType: AddonFileTypes.bp_items,
+					path: item.path
+				})
+			}
+			break;
+
+		case SymbolType.ItemTextureShortname:
+			const item_with_shortname = parsedProject.bp_items[symbol.value]
+			if (item_with_shortname) {
+				files.push({
+					fileType: AddonFileTypes.bp_items,
+					path: item_with_shortname.path
+				})
+			}
+			break;
+
+		default:
+			throw Error("Unexpected symbol type: " + symbol.type)
+	}
+
+	return files
+}
+
+
 export function getAssetsForEntity(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const rp_entity = parsedProject.rp_entity[identifier];
 

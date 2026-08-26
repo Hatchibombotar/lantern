@@ -29,8 +29,6 @@ export class ProjectParser {
         const bpBlocks = this.parseBPBlocks()
 
         const parsedProject: ParsedProject = {
-            resourcePackDir: this.resourcePackDir,
-            behaviorPackDir: this.behaviorPackDir,
             rp_entity: rpEntities,
             rp_attachables: this.parseRPAttachables(),
             rp_anims: this.parseRPAnimations(),
@@ -45,8 +43,8 @@ export class ProjectParser {
             bp_items: bpItems,
             bp_blocks: bpBlocks,
             script_links: this.parseScriptLinks(rpEntities, bpEntities, bpItems, bpBlocks),
+            script_files: this.getScriptFilePaths(),
             errors: [],
-            script_files: this.getScriptFilePaths()
         }
 
         parsedProject.errors = this.errors
