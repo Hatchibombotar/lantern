@@ -1,5 +1,6 @@
 import path from "path"
 import { ProjectFile } from '../analysis/AddonFileTypes'
+import { SymbolType } from "../analysis/symbols"
 
 export function renamePathFromIdentifier(projectFile: ProjectFile, oldIdentifier: string, newIdentifier: string) {
     const { dir, base } = path.parse(projectFile.path.relativePath)
@@ -59,7 +60,7 @@ export function renamePathFromIdentifier(projectFile: ProjectFile, oldIdentifier
 }
 
 
-export function renamePathFromNewSymbolValue(projectFile: ProjectFile, oldSymbolValue: string, newSymbolValue: string) {
+export function renamePathFromNewSymbolValue(projectFile: ProjectFile, symbolType: SymbolType, oldSymbolValue: string, newSymbolValue: string) {
     const { dir, base } = path.parse(projectFile.path.relativePath)
 
     const originalName = oldSymbolValue.split(":")[1]
@@ -73,5 +74,24 @@ export function renamePathFromNewSymbolValue(projectFile: ProjectFile, oldSymbol
     const newFileBase = splitBase.join(".")
     
     const newPath = path.join(dir, newFileBase)
+
+    switch (symbolType) {
+        case SymbolType.EntityIdentifier:
+        case SymbolType.BlockIdentifier:
+        case SymbolType.ItemIdentifier:
+        case SymbolType.CullingRule:
+
+        case SymbolType.BPAnimation:
+        case SymbolType.BPAnimationController:
+        case SymbolType.RPAnimation:
+        case SymbolType.RPAnimationController:
+        case SymbolType.RPRenderController:
+            
+        case SymbolType.Geometry:
+        case SymbolType.BlockTextureShortname:
+        case SymbolType.TexturePath:
+            
+        case SymbolType.ItemTextureShortname:
+    }
     return newPath
 }

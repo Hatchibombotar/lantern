@@ -3,6 +3,7 @@ import { ProjectFile } from './analysis/AddonFileTypes';
 import { FilePathData, filePathsEqual } from './FilePathData';
 import { Symbol, SymbolValue, symbolsEqual, symbolTypeReadableName } from './analysis/symbols';
 import path from 'path';
+import { validateSymbol } from './importer/validateSymbol';
 
 // TODO: replace this with selectRenamedSymbols
 export async function selectRenameIdentifiers(identifierMap: Record<string, string>): Promise<undefined | Record<string, string>> {
@@ -78,7 +79,7 @@ export async function selectRenameFiles(files: ProjectFile[], initialRenamed?: [
     while (true) {
         const options: QuickPickItem[] = [
             { label: "Continue" },
-            { label: "identifiers", kind: vscode.QuickPickItemKind.Separator },
+            { label: "files", kind: vscode.QuickPickItemKind.Separator },
         ];
         for (const [index, file] of files.entries()) {
             const option: QuickPickItem = {
@@ -209,7 +210,11 @@ export async function selectRenamedSymbols(symbols: Symbol[], quickPickOptions: 
             value: currentName,
             prompt: `Rename ${result.data.value}`,
             ignoreFocusOut: true,
-            // TODO: add validation; make sure the names are valid.
+            validateInput: (value) => {
+                if (result.data?.type) {
+                    return validateSymbol(result.data.type, value)
+                }
+            }
         });
 
         if (newSymbol !== undefined) {

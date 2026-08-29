@@ -94,7 +94,7 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
                 }
 
                 const newSymbolValue = renamedSymbols.find(([k]) => symbolsEqual(k, symbol))?.[1] ?? symbol.value
-                const renamedPath = renamePathFromNewSymbolValue(file, symbol.value, newSymbolValue)
+                const renamedPath = renamePathFromNewSymbolValue(file, symbol.type, symbol.value, newSymbolValue)
 
                 initialRenamedFiles.push([
                     file, renamedPath
