@@ -57,7 +57,8 @@ export class Importer {
 
         if (symbolsToImportByType[SymbolType.EntityIdentifier]) {
             for (const symbol of symbolsToImportByType[SymbolType.EntityIdentifier]) {
-                await this.importEntity(symbol)
+                await this.importBPEntity(symbol)
+                await this.importRPEntityOrAttachable(symbol)
             }
         }
 
@@ -118,6 +119,7 @@ export class Importer {
         if (symbolsToImportByType[SymbolType.BlockIdentifier]) {
             for (const symbol of symbolsToImportByType[SymbolType.BlockIdentifier]) {
                 await this.importBlock(symbol)
+                await this.importRPEntityOrAttachable(symbol)
             }
             await this.importBlocksDotJson(
                 symbolsToImportByType[SymbolType.BlockIdentifier]
@@ -154,6 +156,7 @@ export class Importer {
         if (symbolsToImportByType[SymbolType.ItemIdentifier]) {
             for (const symbol of symbolsToImportByType[SymbolType.ItemIdentifier]) {
                 await this.importItem(symbol)
+                await this.importRPEntityOrAttachable(symbol)
             }
         }
 
@@ -196,113 +199,143 @@ export class Importer {
         return filesToImport
     }
 
-    async importEntity(
+    async importBPEntity(
         symbol: Symbol,
     ) {
-        const newSymbolValue = this.getRenamedSymbolValue(symbol)
-
-        if (this.sourceProject.bp_entity[symbol.value] !== undefined) {
-            const bp_entity = this.sourceProject.bp_entity[symbol.value]
-            const file = (await fs.readFile(bp_entity.path.exactPath)).toString()
-
-            let errors: JSONC.ParseError[] = [];
-            // const parsedFile = JSONC.parse(file, errors)
-
-            if (errors.length > 0) {
-                throw Error(errors.toString())
-            }
-
-            let result = jsoncModifyandEditWithInitialisedParents(
-                file,
-                ["minecraft:entity", "description", "identifier"],
-                newSymbolValue
-            )
-
-            const destinationFilePath = this.getDestinationFilePath(bp_entity.path)
-            await this.writeFileInProject(destinationFilePath, result, bp_entity.path)
-
-            // TODO: rename BP animations and animation controllers.
+        if (this.sourceProject.bp_entity[symbol.value] === undefined) {
+            console.error("BP Entity not defined for entity: " + symbol.value)
+            return
         }
 
-        if (this.sourceProject.rp_entity[symbol.value] !== undefined) {
-            const rp_entity = this.sourceProject.rp_entity[symbol.value]
-            const file = (await fs.readFile(rp_entity.path.exactPath)).toString()
+        const newSymbolValue = this.getRenamedSymbolValue(symbol)
 
-            let errors: JSONC.ParseError[] = [];
-            const parsedFile = JSONC.parse(file, errors)
+        const bp_entity = this.sourceProject.bp_entity[symbol.value]
+        const file = (await fs.readFile(bp_entity.path.exactPath)).toString()
 
-            if (errors.length > 0) {
-                throw Error(errors.toString())
+        let errors: JSONC.ParseError[] = [];
+        // const parsedFile = JSONC.parse(file, errors)
+
+        if (errors.length > 0) {
+            throw Error(errors.toString())
+        }
+
+        let result = jsoncModifyandEditWithInitialisedParents(
+            file,
+            ["minecraft:entity", "description", "identifier"],
+            newSymbolValue
+        )
+
+        const destinationFilePath = this.getDestinationFilePath(bp_entity.path)
+        await this.writeFileInProject(destinationFilePath, result, bp_entity.path)
+
+        // TODO: rename BP animations and animation controllers.
+
+    }
+
+    async importRPEntityOrAttachable(
+        symbol: Symbol,
+    ) {
+        let rp_entity: ParsedProject.ClientEntity
+        let rootObject: string
+
+        if (symbol.type === SymbolType.EntityIdentifier) {
+            if (this.sourceProject.rp_entity[symbol.value] === undefined) {
+                console.warn("RP Entity not defined for entity: " + symbol.value)
+                return
+            } else {
+                rp_entity = this.sourceProject.rp_entity[symbol.value]
+                rootObject = "minecraft:client_entity"
             }
-
-            let result = jsoncModifyandEditWithInitialisedParents(
-                file,
-                ["minecraft:client_entity", "description", "identifier"],
-                newSymbolValue
-            )
-
-            const animations = parsedFile["minecraft:client_entity"]["description"]["animations"] as Record<string, string>
-
-            for (const [shortname, animation] of Object.entries(animations)) {
-                const renamedAnimation = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPAnimation, value: animation }))
-
-                if (renamedAnimation) {
-                    result = jsoncModifyandEditWithInitialisedParents(
-                        result,
-                        ["minecraft:client_entity", "description", "animations", shortname],
-                        renamedAnimation[1]
-                    )
-                }
+        } else if (symbol.type === SymbolType.ItemIdentifier || symbol.type === SymbolType.BlockIdentifier) {
+            if (this.sourceProject.rp_attachables[symbol.value] === undefined) {
+                console.warn("Attachable not defined for symbol: " + symbol.value)
+                return
+            } else {
+                rp_entity = this.sourceProject.rp_attachables[symbol.value]
+                rootObject = "minecraft:attachable"
             }
+        } else {
+            throw Error(`Unexpected symbol ${symbol.type}: ${symbol.value}`)
+        }
 
+        const newSymbolValue = this.getRenamedSymbolValue(symbol)
 
-            for (const [shortname, animation] of Object.entries(animations)) {
-                const renamedAnimation = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPAnimationController, value: animation }))
+        const file = (await fs.readFile(rp_entity.path.exactPath)).toString()
 
-                if (renamedAnimation) {
-                    result = jsoncModifyandEditWithInitialisedParents(
-                        result,
-                        ["minecraft:client_entity", "description", "animations", shortname],
-                        renamedAnimation[1]
-                    )
-                }
+        let errors: JSONC.ParseError[] = [];
+        const parsedFile = JSONC.parse(file, errors)
+
+        if (errors.length > 0) {
+            throw Error(errors.toString())
+        }
+
+        let result = jsoncModifyandEditWithInitialisedParents(
+            file,
+            [rootObject, "description", "identifier"],
+            newSymbolValue
+        )
+
+        const animations = parsedFile[rootObject]["description"]["animations"] as Record<string, string>
+
+        for (const [shortname, animation] of Object.entries(animations)) {
+            const renamedAnimation = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPAnimation, value: animation }))
+
+            if (renamedAnimation) {
+                result = jsoncModifyandEditWithInitialisedParents(
+                    result,
+                    [rootObject, "description", "animations", shortname],
+                    renamedAnimation[1]
+                )
             }
+        }
 
-            const seperately_referenced_animation_controllers = parsedFile["minecraft:client_entity"]["description"]["animation_controllers"] as Record<string, string>[]
-            if (seperately_referenced_animation_controllers) {
-                for (const [index, acs] of seperately_referenced_animation_controllers.entries()) {
 
-                    for (const [shortname, animationController] of Object.entries(acs)) {
-                        const renamedAnimationController = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPAnimationController, value: animationController }))
+        for (const [shortname, animation] of Object.entries(animations)) {
+            const renamedAnimation = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPAnimationController, value: animation }))
 
-                        if (renamedAnimationController) {
-                            result = jsoncModifyandEditWithInitialisedParents(
-                                result,
-                                ["minecraft:client_entity", "description", "animation_controllers", index, shortname],
-                                renamedAnimationController[1]
-                            )
-                        }
+            if (renamedAnimation) {
+                result = jsoncModifyandEditWithInitialisedParents(
+                    result,
+                    [rootObject, "description", "animations", shortname],
+                    renamedAnimation[1]
+                )
+            }
+        }
+
+        const seperately_referenced_animation_controllers = parsedFile[rootObject]["description"]["animation_controllers"] as Record<string, string>[]
+        if (seperately_referenced_animation_controllers) {
+            for (const [index, acs] of seperately_referenced_animation_controllers.entries()) {
+
+                for (const [shortname, animationController] of Object.entries(acs)) {
+                    const renamedAnimationController = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPAnimationController, value: animationController }))
+
+                    if (renamedAnimationController) {
+                        result = jsoncModifyandEditWithInitialisedParents(
+                            result,
+                            [rootObject, "description", "animation_controllers", index, shortname],
+                            renamedAnimationController[1]
+                        )
                     }
                 }
             }
-
-            const render_controllers = parsedFile["minecraft:client_entity"]["description"]["render_controllers"] as string[]
-
-            for (const [index, renderController] of render_controllers.entries()) {
-                const renamedRenderController = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPRenderController, value: renderController }))
-
-                if (renamedRenderController) {
-                    result = jsoncModifyandEditWithInitialisedParents(
-                        result,
-                        ["minecraft:client_entity", "description", "render_controllers", index],
-                        renamedRenderController[1]
-                    )
-                }
-            }
-
-            const destinationFilePath = this.getDestinationFilePath(rp_entity.path)
-            await this.writeFileInProject(destinationFilePath, result, rp_entity.path)
         }
+
+        const render_controllers = parsedFile[rootObject]["description"]["render_controllers"] as string[]
+
+        for (const [index, renderController] of render_controllers.entries()) {
+            const renamedRenderController = this.renamedSymbols.find(([x, _]) => symbolsEqual(x, { type: SymbolType.RPRenderController, value: renderController }))
+
+            if (renamedRenderController) {
+                result = jsoncModifyandEditWithInitialisedParents(
+                    result,
+                    [rootObject, "description", "render_controllers", index],
+                    renamedRenderController[1]
+                )
+            }
+        }
+
+        const destinationFilePath = this.getDestinationFilePath(rp_entity.path)
+        await this.writeFileInProject(destinationFilePath, result, rp_entity.path)
     }
 
     async importBlock(

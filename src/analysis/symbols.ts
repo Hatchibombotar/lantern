@@ -117,10 +117,52 @@ export function getReferencedEntitySymbols(project: ParsedProject, entityId: str
     return symbols
 }
 
+export function getReferencedAttachableSymbols(clientEntity: ParsedProject.ClientEntity) {
+    const symbols: Symbol[] = []
+
+    if (clientEntity) {
+        for (const animation of clientEntity.animations) {
+            const fileType = animation.split(".")[0]
+
+            if (fileType === "animation") {
+                symbols.push({
+                    type: SymbolType.RPAnimation,
+                    value: animation,
+                })
+            } else if (fileType === "controller") {
+                symbols.push({
+                    type: SymbolType.RPAnimationController,
+                    value: animation,
+                })
+            }
+        }
+        for (const animationController of clientEntity.seperately_referenced_animation_controllers) {
+            symbols.push({
+                type: SymbolType.RPAnimationController,
+                value: animationController,
+            })
+        }
+        for (const rc_name of clientEntity.render_controllers) {
+            symbols.push({
+                type: SymbolType.RPRenderController,
+                value: rc_name,
+            })
+        }
+
+        for (const model of clientEntity.models) {
+            symbols.push({
+                type: SymbolType.Geometry,
+                value: model,
+            })
+        }
+    }
+
+    return symbols
+}
+
 export function getReferencedBlockSymbols(project: ParsedProject, identifier: string) {
     const bp_block = project.bp_blocks[identifier]
     const symbols: Symbol[] = []
-
 
     if (bp_block) {
         for (const culling of bp_block.cullingRules) {
@@ -152,6 +194,13 @@ export function getReferencedBlockSymbols(project: ParsedProject, identifier: st
         }
     }
 
+    const attachable = project.rp_attachables[identifier]
+    if (attachable) {
+        symbols.push(
+            ...getReferencedAttachableSymbols(attachable)
+        )
+    }
+
     return symbols
 }
 
@@ -175,6 +224,13 @@ export function getReferencedItemSymbols(project: ParsedProject, identifier: str
                 value: texture,
             })
         }
+    }
+
+    const attachable = project.rp_attachables[identifier]
+    if (attachable) {
+        symbols.push(
+            ...getReferencedAttachableSymbols(attachable)
+        )
     }
 
     return symbols
@@ -220,13 +276,10 @@ export function getSymbolsLinkedByIdentifier(project: ParsedProject, identifier:
     switch (identifier.type) {
         case SymbolType.EntityIdentifier:
             return getReferencedEntitySymbols(project, identifier.value)
-            break
         case SymbolType.BlockIdentifier:
             return getReferencedBlockSymbols(project, identifier.value)
-            break
         case SymbolType.ItemIdentifier:
             return getReferencedItemSymbols(project, identifier.value)
-            break
         default:
             throw Error("Identifier type not handled correctly: " + identifier)
     }

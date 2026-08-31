@@ -142,7 +142,6 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
         if (scriptImportOptions.shouldImport) {
             await importer.importScripts(scriptImportOptions.copyToDirName)
         }
-
     }
 
     // If we wanted to include files not caught by the importer

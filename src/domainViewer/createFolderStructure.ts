@@ -196,6 +196,7 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 	return folder
 }
 
+// TODO: consider if the structure could be created from just projectData.
 export function parseBlocksInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
 		type: "folder",
@@ -268,27 +269,6 @@ export function getScriptsForIdentifier(parsedProject: ParsedProject, identifier
 		links.push(link)
 	}
 	return links
-}
-
-export function getFilesForIdentifierSymbol(identifier: Symbol, sourceProject: ParsedProject): ProjectFile[] {
-	let files = []
-	switch (identifier.type) {
-		case SymbolType.EntityIdentifier:
-			files = getFilesForEntity(sourceProject, identifier.value)
-			files.push(...getAssetsForEntity(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
-			break
-		case SymbolType.BlockIdentifier:
-			files = getFilesForBlock(sourceProject, sourceProject.bp_blocks[identifier.value])
-			files.push(...getAssetsForBlock(sourceProject, sourceProject.bp_blocks[identifier.value]).filter(x => x.fileType !== AddonFileTypes.rp_texture))
-			break
-		case SymbolType.ItemIdentifier:
-			files = getFilesForItem(sourceProject, identifier.value)
-			files.push(...getAssetsForItem(sourceProject, identifier.value).filter(x => x.fileType !== AddonFileTypes.rp_texture))
-			break
-		default:
-			throw Error("Identifier type not handled correctly: " + identifier)
-	}
-	return files
 }
 
 // Functions that get all files that are referenced within 

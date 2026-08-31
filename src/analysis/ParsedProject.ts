@@ -8,22 +8,8 @@ import { SymbolValue } from './symbols';
 export type ParsedProject = {
 
 	// RP
-	"rp_entity": Record<SymbolValue, {
-		path: FilePathData;
-		animations: string[];
-		seperately_referenced_animation_controllers: string[]; // used for the 1.8.0 client entity format version as they are not referenced within the animations key.
-
-		// TODO: make stored location of animation controllers consistent.
-		render_controllers: string[];
-
-		models: SymbolValue[];
-		textures: string[];
-	}>;
-	"rp_attachables": Record<SymbolValue, {
-		path: FilePathData;
-		animations: string[];
-		render_controllers: string[];
-	}>;
+	"rp_entity": Record<SymbolValue, ParsedProject.ClientEntity>;
+	"rp_attachables": Record<SymbolValue, ParsedProject.ClientEntity>;
 	"rp_anims": Record<SymbolValue, ParsedProject.Animation>;
 	"rp_animation_controllers": Record<SymbolValue, FilePathData>;
 	"rp_render_controllers": Record<SymbolValue, FilePathData>;
@@ -70,6 +56,19 @@ export namespace ParsedProject {
 		models: SymbolValue[];
 
 		textureShortnames: SymbolValue[];
+		textures: string[];
+	}
+
+	// Used for entities and attachables
+	export type ClientEntity = {
+		path: FilePathData;
+		// TODO: make stored location of animation controllers consistent.
+		animations: string[];
+		seperately_referenced_animation_controllers: string[]; // used for the 1.8.0 client entity format version as they are not referenced within the animations key.
+
+		render_controllers: string[];
+
+		models: SymbolValue[];
 		textures: string[];
 	}
 

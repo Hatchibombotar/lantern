@@ -88,11 +88,11 @@ export class ProjectParser {
 
         return files
     }
-    
+
     getScriptFilePaths(): FilePathData[] {
         const files = fs.globSync(path.join(this.behaviorPackDir, "./scripts/**/*.{ts,js}"))
 
-        const paths: FilePathData[] = files.map(exactPath => 
+        const paths: FilePathData[] = files.map(exactPath =>
             getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, exactPath)
         )
 
@@ -108,7 +108,7 @@ export class ProjectParser {
         const errors: JSONC.ParseError[] = []
         const parsedFile = JSONC.parse(fileString, errors)
         this.addJSONParseErrors(errors, manifestPathBP)
-        
+
         for (const module of parsedFile["modules"] ?? []) {
             if (module["type"] === "script") {
                 if (module["entry"]) {
@@ -131,52 +131,89 @@ export class ProjectParser {
     private parseRPEntities(): ParsedProject["rp_entity"] {
         const rp_entities: ParsedProject["rp_entity"] = {}
         const rp_entity_files = fs.globSync(path.join(this.resourcePackDir, "./entity/**/*.json"))
+
         for (const path of rp_entity_files) {
-            const fileString = fs.readFileSync(path).toString()
+            const parsed = this.parseRPEntityOrAttachable(path, "rp_entity")
+            if (parsed === undefined) continue
 
-            const errors: JSONC.ParseError[] = []
-            const parsedFile = JSONC.parse(fileString, errors)
-            this.addJSONParseErrors(errors, path)
-
-            const identifier = parsedFile["minecraft:client_entity"]?.description?.identifier
-
-            if (typeof identifier !== "string") {
-                this.addError("Unable to parse identifier", path)
-                continue
-            }
-
-            const render_controllers: string[] = []
-            if (parsedFile["minecraft:client_entity"]?.description?.render_controllers) {
-                for (const rc of parsedFile["minecraft:client_entity"].description.render_controllers) {
-                    if (typeof rc === "string") {
-                        render_controllers.push(rc)
-                    } else if (typeof rc === "object") {
-                        for (const key of Object.keys(rc)) {
-                            render_controllers.push(key)
-                        }
-                    } else {
-                        console.error("unexpected typeof rc")
-                    }
-                }
-            }
-
-            const animations = parsedFile["minecraft:client_entity"]?.description?.animations ? Object.values(parsedFile["minecraft:client_entity"]?.description?.animations) : []
-
-            // FINISH
-            const seperately_referenced_animation_controllers =
-                parsedFile["minecraft:client_entity"]?.description?.animation_controllers ?
-                    parsedFile["minecraft:client_entity"]?.description?.animation_controllers.map((x: { [ac: string]: string }) => Object.values(x)).flat() : []
-
-
-            const models = Object.values(parsedFile["minecraft:client_entity"]?.description?.geometry ?? {})
-            const textures = Object.values(parsedFile["minecraft:client_entity"]?.description?.textures ?? {})
-
+            const [identifier, entity] = parsed
+            
             if (rp_entities[identifier] !== undefined) {
                 this.addError("Multiple RP entity files have the same identifier.", path)
                 this.addError("Multiple RP entity files have the same identifier.", rp_entities[identifier].path.exactPath)
             }
+            rp_entities[identifier] = entity
+        }
 
-            rp_entities[identifier] = {
+        return rp_entities
+    }
+
+    
+    private parseRPAttachables(): ParsedProject["rp_attachables"] {
+        const rp_attachables: ParsedProject["rp_attachables"] = {}
+        const rp_attachable_files = fs.globSync(path.join(this.resourcePackDir, "./attachables/**/*.json"))
+
+        for (const path of rp_attachable_files) {
+            const parsed = this.parseRPEntityOrAttachable(path, "attachable")
+            if (parsed === undefined) continue
+
+            const [identifier, attachable] = parsed
+            
+            if (rp_attachables[identifier] !== undefined) {
+                this.addError("Multiple RP attachable files have the same identifier.", path)
+                this.addError("Multiple RP attachable files have the same identifier.", rp_attachables[identifier].path.exactPath)
+            }
+            rp_attachables[identifier] = attachable
+        }
+
+        return rp_attachables
+    }
+
+    private parseRPEntityOrAttachable(path: string, type: "rp_entity" | "attachable"): [string, ParsedProject.ClientEntity] | undefined {
+        const fileString = fs.readFileSync(path).toString()
+
+        const errors: JSONC.ParseError[] = []
+        const parsedFile = JSONC.parse(fileString, errors)
+        this.addJSONParseErrors(errors, path)
+
+        const rootObject = type === "rp_entity" ? "minecraft:client_entity" : "minecraft:attachable"
+
+        const identifier = parsedFile[rootObject]?.description?.identifier
+
+        if (typeof identifier !== "string") {
+            this.addError("Unable to parse identifier", path)
+            return
+        }
+
+        const render_controllers: string[] = []
+        if (parsedFile[rootObject]?.description?.render_controllers) {
+            for (const rc of parsedFile[rootObject].description.render_controllers) {
+                if (typeof rc === "string") {
+                    render_controllers.push(rc)
+                } else if (typeof rc === "object") {
+                    for (const key of Object.keys(rc)) {
+                        render_controllers.push(key)
+                    }
+                } else {
+                    console.error("unexpected typeof rc")
+                }
+            }
+        }
+
+        const animations = parsedFile[rootObject]?.description?.animations ? Object.values(parsedFile[rootObject]?.description?.animations) : []
+
+        // FINISH
+        const seperately_referenced_animation_controllers =
+            parsedFile[rootObject]?.description?.animation_controllers ?
+                parsedFile[rootObject]?.description?.animation_controllers.map((x: { [ac: string]: string }) => Object.values(x)).flat() : []
+
+
+        const models = Object.values(parsedFile[rootObject]?.description?.geometry ?? {})
+        const textures = Object.values(parsedFile[rootObject]?.description?.textures ?? {})
+
+        return [
+            identifier,
+            {
                 path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, path),
                 animations: animations as string[],
                 seperately_referenced_animation_controllers: seperately_referenced_animation_controllers as string[],
@@ -186,52 +223,7 @@ export class ProjectParser {
 
                 render_controllers
             }
-        }
-
-        return rp_entities
-    }
-
-    private parseRPAttachables(): ParsedProject["rp_attachables"] {
-        const rp_attachables: ParsedProject["rp_attachables"] = {}
-        const rp_attachable_files = fs.globSync(path.join(this.resourcePackDir, "./attachables/**/*.json"))
-        for (const entity_path of rp_attachable_files) {
-
-            const fileString = fs.readFileSync(entity_path).toString()
-
-            const errors: JSONC.ParseError[] = []
-            const parsedFile = JSONC.parse(fileString, errors)
-            this.addJSONParseErrors(errors, entity_path)
-
-            const identifier = parsedFile["minecraft:attachable"].description.identifier
-
-            if (typeof identifier !== "string") {
-                this.addError("Unable to parse identifier", entity_path)
-                continue
-            }
-
-            const render_controllers: string[] = []
-            if (parsedFile["minecraft:attachable"]?.description?.render_controllers) {
-                for (const rc of parsedFile["minecraft:attachable"].description.render_controllers) {
-                    if (typeof rc === "string") {
-                        render_controllers.push(rc)
-                    } else if (typeof rc === "object") {
-                        for (const key of Object.keys(rc)) {
-                            render_controllers.push(key)
-                        }
-                    } else {
-                        console.error("unexpected typeof rc")
-                    }
-                }
-            }
-
-            rp_attachables[identifier] = {
-                path: getDetailedPathInfo(this.resourcePackDir, this.behaviorPackDir, entity_path),
-                animations: Object.values(parsedFile["minecraft:attachable"].description.animations ?? {}),
-                render_controllers
-            }
-        }
-
-        return rp_attachables
+        ]
     }
 
     private parseRPAnimations(): ParsedProject["rp_anims"] {
