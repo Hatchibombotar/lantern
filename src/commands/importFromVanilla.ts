@@ -5,15 +5,15 @@ import { simpleGit, SimpleGitProgressEvent } from 'simple-git';
 import { createGlobalStorageDirectory } from '../utils';
 import { existsSync } from 'fs';
 import { AddonFileTypes } from '../analysis/AddonFileTypes';
-import { Node } from '../domainViewer/createFolderStructure';
+import { getDefinitionFileForSymbol, Node } from '../domainViewer/createFolderStructure';
 import { ProjectFile } from '../analysis/AddonFileTypes';
-import { getFilesForEntity } from '../domainViewer/createFolderStructure';
-import { getReferencedEntitySymbols, Symbol, SymbolType, SymbolValue } from '../analysis/symbols';
-import { selectRenamedSymbols } from '../quickPickUtils';
+import { getSymbolsLinkedByIdentifier, Symbol, symbolsEqual, SymbolType, SymbolValue } from '../analysis/symbols';
+import { showRenameSymbolsUI } from '../quickPickUtils';
 import { Importer } from '../importer/Importer';
 import { ProjectParser } from '../analysis/ProjectParser';
-import { selectRenameFiles, selectRenameIdentifiers } from '../quickPickUtils';
+import { showRenameFilesUI } from '../quickPickUtils';
 import { renameSymbolFromIdentifier } from '../importer/renameSymbols';
+import { renamePathFromIdentifier } from '../importer/renamePaths';
 
 // export default function registerVanillaDataCommands(context: vscode.ExtensionContext) {
 //     context.subscriptions.push(
@@ -114,122 +114,57 @@ async function importEntityFromProject(projectParser: ProjectParser, folderPath?
     })
     if (entityId === undefined) return
 
-    const identifierMap = Object.fromEntries([
-        [entityId, entityId]
-    ])
+    const identifier = { type: SymbolType.EntityIdentifier, value: entityId }
 
     // 2. Rename identifier
-    // TODO: Add automatic namespace taken from the 'namespace' key in project config.
-    const newIdentifiers = await selectRenameIdentifiers(identifierMap)
+    const newIdentifiers = await showRenameSymbolsUI(
+        [ identifier ],
+        {
+            title: "Rename identifiers"
+        }
+    )
     if (newIdentifiers === undefined) return
 
-    const newIdentifier = newIdentifiers[entityId]
+    const newIdentifier = newIdentifiers.find(([k]) => symbolsEqual(k, identifier))?.[1] ?? identifier.value
 
-    const symbols = getReferencedEntitySymbols(sourceProject, entityId)
+    const symbols = getSymbolsLinkedByIdentifier(sourceProject, identifier)
     if (symbols === undefined) return
 
     // 3. Rename symbols
     const initialRenamedSymbols: [Symbol, SymbolValue][] = [
-        [{ type: SymbolType.EntityIdentifier, value: entityId }, newIdentifier]
+        [identifier, newIdentifier]
     ]
 
-    const originalName = entityId.split(":")[1]
-    const newNamespace = newIdentifier.split(":")[0]
-    const newName = newIdentifier.split(":")[1]
-
     for (const symbol of symbols) {
-        const newSymbolValue = renameSymbolFromIdentifier(symbol, entityId, newIdentifier)
+        const newSymbolValue = renameSymbolFromIdentifier(symbol, identifier.value, newIdentifier)
         initialRenamedSymbols.push(
             [symbol, newSymbolValue]
         )
     }
 
-    const renamedSymbols = await selectRenamedSymbols(symbols, {}, initialRenamedSymbols)
+    const renamedSymbols = await showRenameSymbolsUI(symbols, {}, initialRenamedSymbols)
     if (renamedSymbols === undefined) return
 
-    const files = getFilesForEntity(sourceProject, entityId)
-
     // 4. Rename files
+    const files = getDefinitionFileForSymbol(sourceProject, identifier)
     const initialRenamedFiles: [ProjectFile, string][] = []
 
-    // rename files roughly based on renamed entity
     for (const file of files) {
-        const { dir, base } = path.parse(file.path.relativePath)
-
-        const splitBase = base.split(".")
-        if (splitBase[0] === originalName) {
-            splitBase[0] = newName
+        // We save texture files seperately using the TexturePath symbol
+        if (file.fileType === AddonFileTypes.rp_texture) {
+            continue
         }
 
-        const newFileBase = splitBase.join(".")
+        // Initially rename files if they include the old identifier value
+        const renamedPath = renamePathFromIdentifier(file, identifier.value, newIdentifier)
 
-        switch (file.fileType) {
-            case AddonFileTypes.bp_entity: {
-                if (folderPath) {
-                    const newPath = path.join("entities", folderPath, newFileBase)
-                    initialRenamedFiles.push(
-                        [
-                            file,
-                            newPath
-                        ]
-                    )
-                }
-                break;
-            }
-            case AddonFileTypes.rp_entity: {
-                if (folderPath) {
-                    const newPath = path.join("entity", folderPath, newFileBase)
-                    initialRenamedFiles.push(
-                        [
-                            file,
-                            newPath
-                        ]
-                    )
-                }
-                break;
-            }
-            case AddonFileTypes.rp_animation:
-            case AddonFileTypes.bp_animation:
-            case AddonFileTypes.rp_animation_controllers:
-            case AddonFileTypes.bp_animation_controllers:
-            case AddonFileTypes.rp_render_controllers: {
-                const newPath = path.join(dir, newFileBase)
-                initialRenamedFiles.push(
-                    [
-                        file,
-                        newPath
-                    ]
-                )
-                break;
-            }
-            case AddonFileTypes.bp_items: {
-                if (folderPath) {
-                    const newPath = path.join("items", folderPath, newFileBase)
-                    initialRenamedFiles.push(
-                        [
-                            file,
-                            newPath
-                        ]
-                    )
-                }
-                break;
-            }
-            case AddonFileTypes.rp_attachable: {
-                if (folderPath) {
-                    const newPath = path.join("attachables", folderPath, newFileBase)
-                    initialRenamedFiles.push(
-                        [
-                            file,
-                            newPath
-                        ]
-                    )
-                }
-                break;
-            }
-        }
+        initialRenamedFiles.push([
+            file, renamedPath
+        ])
+
     }
 
-    const renamedFiles = await selectRenameFiles(
+    const renamedFiles = await showRenameFilesUI(
         files,
         initialRenamedFiles
     )
@@ -242,6 +177,7 @@ async function importEntityFromProject(projectParser: ProjectParser, folderPath?
     )
     try {
         await importer.importSymbolsFromProject(symbols)
+        await importer.applyFileChanges()
     } catch (err) {
         vscode.window.showErrorMessage(new Error(err as any).message)
         vscode.window.showErrorMessage("An error occured when trying to import.")

@@ -59,7 +59,7 @@ export async function selectRenameIdentifiers(identifierMap: Record<string, stri
 }
 
 // Returns a map from the original path to the new path. (Both relative to their RP/BP folder.)
-export async function selectRenameFiles(files: ProjectFile[], initialRenamed?: [ProjectFile, string][]): Promise<undefined | [ProjectFile, string][]> {
+export async function showRenameFilesUI(files: ProjectFile[], initialRenamed?: [ProjectFile, string][]): Promise<undefined | [ProjectFile, string][]> {
     interface QuickPickItem extends vscode.QuickPickItem {
         data?: ProjectFile;
         index?: number;
@@ -130,7 +130,7 @@ export async function selectRenameFiles(files: ProjectFile[], initialRenamed?: [
     return renames;
 }
 
-export async function showSelectFiles(files: FilePathData[], options: vscode.QuickPickOptions = {}): Promise<FilePathData[] | undefined> {
+export async function showSelectFilesUI(files: FilePathData[], options: vscode.QuickPickOptions = {}): Promise<FilePathData[] | undefined> {
     const result = await vscode.window.showQuickPick(
         files.map(file => ({
             label: file.rootType + path.sep + file.relativePath,
@@ -151,7 +151,7 @@ export async function showSelectFiles(files: FilePathData[], options: vscode.Qui
 
 /** Show a VSCODE quick picker that allows a user to rename symbols.
 Returns an array where each item is a tuple containing the original symbol and a renamed value. */
-export async function selectRenamedSymbols(symbols: Symbol[], quickPickOptions: vscode.QuickPickOptions = {}, initialRenamed?: [Symbol, SymbolValue | null][]): Promise<undefined | [Symbol, SymbolValue][]> {
+export async function showRenameSymbolsUI(symbols: Symbol[], quickPickOptions: vscode.QuickPickOptions = {}, initialRenamed?: [Symbol, SymbolValue | null][]): Promise<undefined | [Symbol, SymbolValue][]> {
     interface QuickPickItem extends vscode.QuickPickItem {
         data?: Symbol;
         index?: number;

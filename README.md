@@ -16,13 +16,21 @@ In the below picture, it shows all files linked to the zombie in the vanilla pac
 ![Example](./images/preview-2.png)
 
 ### Import from Snippet Repository
-Lantern has a smart import feature that allows you to import files from repositories. It renames imported files, their identifiers, and references to save you time.
+Lantern has a smart import feature that allows you to import files from repositories.
+![alt text](./images/import-snippet.png)
+
+It renames imported files, their identifiers, and references to save you time.
+![alt text](./images/rename-symbols.png)
 
 To use this, click on the package icon in the lantern menu or run `Lantern: Open Snippet Repository UI` from the command pallete.
+
+![alt text](./images/snippet_button.png)
 
 To begin with, you must add a source for your snippets. Press the plus button on the top of the UI that is now open.
 
 The repository `https://github.com/Bedrock-OSS/bedrock-examples` is a collection of examples created by Bedrock-OSS. Paste the link into the vscode dialogue to add it.
+
+You can also [create your own repositories](./creating-snippet-repos.md) to fetch snippets from.
 
 ### Import from Vanilla Packs
 If you right click on a directory in the entity section of the grouped files panel you can select `Import Entity from Vanilla`. A UI will come up which allows you to rename the identifier and files linked to the entity.
@@ -34,7 +42,6 @@ You can also run this using the command pallete under the command `Lantern: Impo
 This will download everything that links to the entity e.g. animations, render controllers
 
 ### Linking scripts
-
 Scripts aren't tied to a single identifier, so you link them explicitly with a `@lantern-links-*` comment placed directly above the code it relates to:
 
 ```ts

@@ -7,14 +7,15 @@ import { showErrorInTextDocument } from '../utils';
 import { ProjectParser } from '../analysis/ProjectParser';
 import { Importer } from '../importer/Importer';
 import { getIdentifierSymbols, getSymbolsLinkedByIdentifier, Symbol, symbolsEqual, SymbolValue } from '../analysis/symbols';
-import { selectRenamedSymbols as showRenameSymbolsUI, showSelectFiles } from '../quickPickUtils';
-import { selectRenameFiles } from '../quickPickUtils';
+import { showRenameSymbolsUI, showSelectFilesUI } from '../quickPickUtils';
+import { showRenameFilesUI } from '../quickPickUtils';
 import { renameSymbolFromIdentifier } from '../importer/renameSymbols';
 import { getDefinitionFileForSymbol } from '../domainViewer/createFolderStructure';
 import { AddonFileTypes, ProjectFile } from '../analysis/AddonFileTypes';
-import { renamePathFromNewSymbolValue } from '../importer/renamePaths';
+import { renamePathFromIdentifier } from '../importer/renamePaths';
 import { filePathsEqual } from '../FilePathData';
 import { getPathForSnippet, SnippetSourceMetaFile } from './snippetRepoManage';
+import { ParsedProject } from '../analysis/ParsedProject';
 
 export async function importSnippetUI(context: vscode.ExtensionContext, selectedRepoUUID: string) {
     const snippetSourcePath = await getPathForSnippet(context, selectedRepoUUID)
@@ -63,6 +64,10 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
         const initialRenamedSymbols: [Symbol, SymbolValue][] = [...newIdentifiers]
         const allSymbols: Symbol[] = [...identifiers]
 
+        const initialRenamedFiles: [ProjectFile, string][] = []
+        const allKnownFiles: ProjectFile[] = []
+
+        // Get all symbols and files referenced by the file each identifier is defined in
         for (const identifier of identifiers) {
             const symbols: Symbol[] = getSymbolsLinkedByIdentifier(sourceProject, identifier)
 
@@ -74,6 +79,23 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
                     [symbol, newValue]
                 )
                 allSymbols.push(symbol)
+
+                const files = getDefinitionFileForSymbol(sourceProject, symbol)
+                for (const file of files) {
+                    // We save texture files seperately using the TexturePath symbol
+                    if (file.fileType === AddonFileTypes.rp_texture) {
+                        continue
+                    }
+
+                    // Initially rename files if they include the old identifier value
+                    const renamedPath = renamePathFromIdentifier(file, identifier.value, newIdentifier)
+
+                    initialRenamedFiles.push([
+                        file, renamedPath
+                    ])
+
+                    allKnownFiles.push(file)
+                }
             }
         }
 
@@ -81,31 +103,8 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
         const renamedSymbols = await showRenameSymbolsUI(allSymbols, {}, initialRenamedSymbols)
         if (renamedSymbols === undefined) return
 
-        const initialRenamedFiles: [ProjectFile, string][] = []
-
-        const allKnownFiles: ProjectFile[] = []
-
-        for (const symbol of allSymbols) {
-            const files = getDefinitionFileForSymbol(sourceProject, symbol)
-            for (const file of files) {
-                // We save texture files seperately using the TexturePath symbol
-                if (file.fileType === AddonFileTypes.rp_texture) {
-                    continue
-                }
-
-                const newSymbolValue = renamedSymbols.find(([k]) => symbolsEqual(k, symbol))?.[1] ?? symbol.value
-                const renamedPath = renamePathFromNewSymbolValue(file, symbol.type, symbol.value, newSymbolValue)
-
-                initialRenamedFiles.push([
-                    file, renamedPath
-                ])
-
-                allKnownFiles.push(file)
-            }
-        }
-
         // UI: Rename files
-        const renamedFiles = await selectRenameFiles(
+        const renamedFiles = await showRenameFilesUI(
             allKnownFiles,
             initialRenamedFiles
         )
@@ -133,50 +132,17 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
         )
     }
 
-    let scriptFileCopyToDirName = path.dirname(metaPath).split(path.sep)?.at(-1) ?? "imported"
-    let shouldImportScriptFiles = true
 
     const hasScriptFiles = sourceProject.script_files.length > 0
-
     if (hasScriptFiles) {
-        // Decide what to do with script files
-        while (true) {
-            const result = await vscode.window.showQuickPick([
-                { id: "import", label: "Import script files" },
-                { id: "doNotImport", label: "Do not import script files" },
-                { label: "Options", kind: vscode.QuickPickItemKind.Separator },
-                { id: "changeCopyToDir", label: "Change folder to copy to", detail: `current: \`bp/scripts/${scriptFileCopyToDirName}/...\`` },
-            ], {
-                title: "Script File Import Options",
-            })
+        let scriptFileCopyToDirName = path.dirname(metaPath).split(path.sep)?.at(-1) ?? "imported"
+        const scriptImportOptions = await getScriptFileImportOptions(sourceProject, scriptFileCopyToDirName)
+        if (scriptImportOptions === undefined) return
 
-            if (result === undefined) return
-
-            if (result.id === "import") {
-                shouldImportScriptFiles = true
-                break
-            } else if (result.id === "doNotImport") {
-                shouldImportScriptFiles = false
-                break
-            } else if (result.id === "changeCopyToDir") {
-                const newName = await vscode.window.showInputBox({
-                    title: "Change script result directory name",
-                    placeHolder: scriptFileCopyToDirName,
-                    validateInput: (str) => {
-                        if (!str.match(/[a-z\-\_\. ]/)) {
-                            return "invalid dirname. Allowed Characters: a-z, -, _"
-                        }
-                    }
-                })
-                if (newName === undefined) continue
-
-                scriptFileCopyToDirName = newName
-            }
+        if (scriptImportOptions.shouldImport) {
+            await importer.importScripts(scriptImportOptions.copyToDirName)
         }
-    }
 
-    if (hasScriptFiles && shouldImportScriptFiles) {
-        await importer.importScripts(scriptFileCopyToDirName)
     }
 
     // If we wanted to include files not caught by the importer
@@ -200,7 +166,7 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
         }
 
         if (extraFiles.length > 0) {
-            const additionalFilesToInclude = await showSelectFiles(extraFiles, { title: "Include untracked files" })
+            const additionalFilesToInclude = await showSelectFilesUI(extraFiles, { title: "Include untracked files" })
 
             if (additionalFilesToInclude === undefined) {
                 return
@@ -209,4 +175,57 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
     }
 
     await importer.applyFileChanges()
+}
+
+async function getScriptFileImportOptions(
+    sourceProject: ParsedProject,
+    defaultDirName: string
+): Promise<{ shouldImport: boolean; copyToDirName: string } | undefined> {
+    if (sourceProject.script_files.length === 0) {
+        return { shouldImport: false, copyToDirName: defaultDirName }
+    }
+
+    let scriptFileCopyToDirName = defaultDirName
+    let shouldImportScriptFiles = true
+
+    while (true) {
+        const result = await vscode.window.showQuickPick(
+            [
+                { id: "import", label: "Import script files" },
+                { id: "doNotImport", label: "Do not import script files" },
+                { label: "Options", kind: vscode.QuickPickItemKind.Separator },
+                {
+                    id: "changeCopyToDir",
+                    label: "Change folder to copy to",
+                    detail: `current: \`bp/scripts/${scriptFileCopyToDirName}/...\``
+                }
+            ],
+            { title: "Script File Import Options" }
+        )
+
+        if (result === undefined) return undefined
+
+        if (result.id === "import") {
+            shouldImportScriptFiles = true
+            break
+        } else if (result.id === "doNotImport") {
+            shouldImportScriptFiles = false
+            break
+        } else if (result.id === "changeCopyToDir") {
+            const newName = await vscode.window.showInputBox({
+                title: "Change script result directory name",
+                placeHolder: scriptFileCopyToDirName,
+                validateInput: (str) => {
+                    if (!str.match(/[a-z\-\_\. ]/)) {
+                        return "invalid dirname. Allowed Characters: a-z, -, _"
+                    }
+                }
+            })
+            if (newName !== undefined) {
+                scriptFileCopyToDirName = newName
+            }
+        }
+    }
+
+    return { shouldImport: shouldImportScriptFiles, copyToDirName: scriptFileCopyToDirName }
 }

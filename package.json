@@ -183,6 +183,10 @@
           "command": "bedrockLantern.showSnippetRepoUI",
           "when": "view == bedrockLantern",
           "group": "navigation"
+        },
+        {
+          "command": "bedrockLantern.importVanillaEntity",
+          "when": "view == bedrockLantern"
         }
       ],
       "view/item/context": [
