@@ -196,7 +196,6 @@ export function parseItemsInFolder(folderPath: string, projectData: ParsedProjec
 	return folder
 }
 
-// TODO: consider if the structure could be created from just projectData.
 export function parseBlocksInFolder(folderPath: string, projectData: ParsedProject, behaviorPackDir: string, resourcePackDir: string, isRoot = false): Folder {
 	const folder: Folder = {
 		type: "folder",
@@ -251,6 +250,61 @@ export function parseBlocksInFolder(folderPath: string, projectData: ParsedProje
 
 	return folder
 }
+
+// A version of the above parseBlocksInFolder function where the structure is created from just the parsed project.
+// - Does not order folders/files correctly
+// - Does not merge consecutive empty directories.
+// export function parseBlocksInFolder(parsedProject: ParsedProject): Folder {
+// 	const root: Folder = {
+// 		type: "folder",
+// 		children: [],
+// 		name: "",
+// 		category: "blocks",
+// 		path: "/"
+// 	}
+
+// 	for (const [identifier, block] of Object.entries(parsedProject.bp_blocks)) {
+// 		if (identifier === undefined || block === undefined) continue
+
+// 		const splitPath = path.relative("blocks", block.path.relativePath).replaceAll("\\", "/").split("/")
+// 		const fileName = splitPath.pop()
+
+// 		// Create folder nodes up to the file
+// 		let currentFolder: Folder = root
+// 		for (const segment of splitPath) {
+// 			let folderExists = false
+// 			for (const child of currentFolder.children) {
+// 				if (child.type === "folder" && child.name === segment) {
+// 					currentFolder = child
+// 					folderExists = true
+// 					break
+// 				}
+// 			}
+// 			if (!folderExists) {
+// 				currentFolder.children.push({
+// 					type: "folder",
+// 					category: "blocks",
+// 					children: [],
+// 					name: segment,
+// 					path: currentFolder.path + segment + "/"
+// 				})
+// 			}
+// 		}
+
+// 		// Create the file
+// 		currentFolder.children.push({
+// 			type: "element",
+// 			identifier: identifier,
+// 			files: getFilesForBlock(parsedProject, block),
+// 			assets: getAssetsForBlock(parsedProject, block),
+// 			scriptLinks: getScriptsForIdentifier(parsedProject, identifier, "blocks"),
+// 			category: "blocks",
+// 			path: currentFolder.path + fileName,
+// 		})
+// 	}
+
+// 	return root
+// }
 
 export function isFolder(x: any): x is Folder {
 	return x && x.type === "folder"
