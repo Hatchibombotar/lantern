@@ -226,8 +226,8 @@ export function parseBlocksInFolder(folderPath: string, projectData: ParsedProje
 			continue
 		}
 
-		const files = getFilesForBlock(projectData, bp_block)
-		const assets = getAssetsForBlock(projectData, bp_block)
+		const files = getFilesForBlock(projectData, identifier)
+		const assets = getAssetsForBlock(projectData, identifier)
 
 		const entityInfo: NodeInfo = {
 			type: "element",
@@ -361,68 +361,81 @@ export function getFilesForEntity(parsedProject: ParsedProject, identifier: stri
 			}
 		}
 	}
+
 	if (rp_entity) {
 		projectFiles.push(
-			{ fileType: AddonFileTypes.rp_entity, path: rp_entity.path }
-		);
-		for (const rp_animation of rp_entity.animations) {
-			if (parsedProject.rp_anims[rp_animation] !== undefined) {
-				const path = parsedProject.rp_anims[rp_animation];
-				if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
-					continue;
-				}
-				projectFiles.push(
-					{
-						fileType: AddonFileTypes.rp_animation,
-						path: path
-					}
-				);
-			} else if (parsedProject.rp_animation_controllers[rp_animation] !== undefined) {
-				const path = parsedProject.rp_animation_controllers[rp_animation];
-				if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
-					continue;
-				}
-				projectFiles.push(
-					{
-						fileType: AddonFileTypes.rp_animation_controllers,
-						path: path
-					}
-				);
-			}
-		}
-		for (const rp_ac of rp_entity.seperately_referenced_animation_controllers) {
-			if (parsedProject.rp_animation_controllers[rp_ac] !== undefined) {
-				const path = parsedProject.rp_animation_controllers[rp_ac];
-				if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
-					continue;
-				}
-				projectFiles.push(
-					{
-						fileType: AddonFileTypes.rp_animation_controllers,
-						path: path
-					}
-				);
-			}
-		}
-		for (const rp_render_controller of rp_entity.render_controllers) {
-			const path = parsedProject.rp_render_controllers[rp_render_controller];
-			if (!path) {
-				// rc does not exist in this project
-				continue;
-			}
+			{ fileType: AddonFileTypes.rp_entity, path: rp_entity.path },
+			...getLinkedFilesForClientEntity(parsedProject, rp_entity)
+		)
+	}
+
+	return projectFiles;
+}
+function getLinkedFilesForClientEntity(parsedProject: ParsedProject, clientEntity: ParsedProject.ClientEntity): ProjectFile[] {
+	const projectFiles: ProjectFile[] = [];
+	if (!clientEntity) return []
+
+	// projectFiles.push(
+	// 	{ fileType: AddonFileTypes.rp_entity, path: clientEntity.path }
+	// );
+	for (const rp_animation of clientEntity.animations) {
+		if (parsedProject.rp_anims[rp_animation] !== undefined) {
+			const path = parsedProject.rp_anims[rp_animation];
 			if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
 				continue;
 			}
 			projectFiles.push(
 				{
-					fileType: AddonFileTypes.rp_render_controllers,
+					fileType: AddonFileTypes.rp_animation,
+					path: path
+				}
+			);
+		} else if (parsedProject.rp_animation_controllers[rp_animation] !== undefined) {
+			const path = parsedProject.rp_animation_controllers[rp_animation];
+			if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
+				continue;
+			}
+			projectFiles.push(
+				{
+					fileType: AddonFileTypes.rp_animation_controllers,
 					path: path
 				}
 			);
 		}
 	}
+	for (const rp_ac of clientEntity.seperately_referenced_animation_controllers) {
+		if (parsedProject.rp_animation_controllers[rp_ac] !== undefined) {
+			const path = parsedProject.rp_animation_controllers[rp_ac];
+			if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
+				continue;
+			}
+			projectFiles.push(
+				{
+					fileType: AddonFileTypes.rp_animation_controllers,
+					path: path
+				}
+			);
+		}
+	}
+	for (const rp_render_controller of clientEntity.render_controllers) {
+		const path = parsedProject.rp_render_controllers[rp_render_controller];
+		if (!path) {
+			// rc does not exist in this project
+			continue;
+		}
+		if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
+			continue;
+		}
+		projectFiles.push(
+			{
+				fileType: AddonFileTypes.rp_render_controllers,
+				path: path
+			}
+		);
+	}
 
-	return projectFiles;
+	return projectFiles
+
 }
 export function getFilesForItem(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const bp_item = parsedProject.bp_items[identifier];
@@ -432,62 +445,30 @@ export function getFilesForItem(parsedProject: ParsedProject, identifier: string
 		projectFiles.push(
 			{ fileType: AddonFileTypes.bp_items, path: bp_item.path }
 		);
-
-		const attachable = parsedProject.rp_attachables[identifier]
-
-		if (attachable) {
-			projectFiles.push(
-				{ fileType: AddonFileTypes.rp_attachable, path: attachable.path },
-			)
-			for (const rp_animation of attachable.animations) {
-				if (parsedProject.rp_anims[rp_animation] !== undefined) {
-					const path = parsedProject.rp_anims[rp_animation]
-					if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
-						continue
-					}
-					projectFiles.push(
-						{
-							fileType: AddonFileTypes.rp_animation,
-							path: path
-						}
-					)
-				} else if (parsedProject.rp_animation_controllers[rp_animation] !== undefined) {
-					const path = parsedProject.rp_animation_controllers[rp_animation]
-					if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
-						continue
-					}
-					projectFiles.push(
-						{
-							fileType: AddonFileTypes.rp_animation_controllers,
-							path: path
-						}
-					)
-				}
-			}
-			for (const rp_render_controller of attachable.render_controllers) {
-				const path = parsedProject.rp_render_controllers[rp_render_controller]
-				if (!path) {
-					// rc does not exist in this project
-					continue
-				}
-				if (projectFiles.find((v) => v.path.exactPath === path.exactPath)) {
-					continue
-				}
-				projectFiles.push(
-					{
-						fileType: AddonFileTypes.rp_render_controllers,
-						path: path
-					}
-				)
-			}
-		}
 	}
+
+
+	const attachable = parsedProject.rp_attachables[identifier]
+
+	if (attachable) {
+		projectFiles.push(
+			{ fileType: AddonFileTypes.rp_attachable, path: attachable.path },
+			...getLinkedFilesForClientEntity(parsedProject, attachable)
+		)
+	}
+	
 
 	return projectFiles;
 }
 // TODO: Make getFilesFor___ functions have consistant parameters
-export function getFilesForBlock(parsedProject: ParsedProject, block: ParsedProject.BPBlock): ProjectFile[] {
+export function getFilesForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const files: ProjectFile[] = []
+
+	const block = parsedProject.bp_blocks[identifier]
+	if (block === undefined) {
+		return []
+	}
+
 	if (block) {
 		files.push(
 			{ fileType: AddonFileTypes.bp_block, path: block.path }
@@ -503,12 +484,23 @@ export function getFilesForBlock(parsedProject: ParsedProject, block: ParsedProj
 		}
 	}
 
+	const attachable = parsedProject.rp_attachables[identifier]
+	if (attachable) {
+		files.push(
+			{
+				fileType: AddonFileTypes.rp_attachable,
+				path: attachable.path
+			},
+			...getLinkedFilesForClientEntity(parsedProject, attachable)
+		)
+	}
+
 	return files
 }
 
 export function getDefinitionFileForSymbol(parsedProject: ParsedProject, symbol: Symbol): ProjectFile[] {
 	const files: ProjectFile[] = []
-	
+
 	switch (symbol.type) {
 		case SymbolType.EntityIdentifier:
 			const bp_entity = parsedProject.bp_entity[symbol.value]
@@ -664,9 +656,18 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 		return []
 	}
 
+	return getAssetsForClientEntity(parsedProject, rp_entity)
+}
+
+
+export function getAssetsForClientEntity(parsedProject: ParsedProject, clientEntity: ParsedProject.ClientEntity): ProjectFile[] {
+	if (clientEntity === undefined) {
+		return []
+	}
+
 	const files: ProjectFile[] = []
 
-	for (const modelIdentifier of rp_entity.models) {
+	for (const modelIdentifier of clientEntity.models) {
 		const modelPath = parsedProject["rp_models"][modelIdentifier]
 		if (modelPath === undefined) continue
 		if (files.find((v) => v.path.exactPath === modelPath.exactPath)) {
@@ -679,7 +680,7 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 		})
 	}
 
-	for (const textureIdentifier of rp_entity.textures) {
+	for (const textureIdentifier of clientEntity.textures) {
 		const texture = parsedProject.rp_textures[textureIdentifier]
 		if (texture === undefined) continue
 		for (const textureFile of texture.files) {
@@ -693,8 +694,13 @@ export function getAssetsForEntity(parsedProject: ParsedProject, identifier: str
 	return files
 }
 
-export function getAssetsForBlock(parsedProject: ParsedProject, bp_block: ParsedProject.BPBlock): ProjectFile[] {
+export function getAssetsForBlock(parsedProject: ParsedProject, identifier: string): ProjectFile[] {
 	const files: ProjectFile[] = []
+
+	const bp_block = parsedProject.bp_blocks[identifier]
+	if (bp_block === undefined) {
+		return []
+	}
 
 	for (const modelIdentifier of bp_block.models) {
 		const modelPath = parsedProject["rp_models"][modelIdentifier]
@@ -721,6 +727,13 @@ export function getAssetsForBlock(parsedProject: ParsedProject, bp_block: Parsed
 		}
 	}
 
+	const attachable = parsedProject.rp_attachables[identifier]
+	if (attachable) {
+		files.push(
+			...getAssetsForClientEntity(parsedProject, attachable)
+		)
+	}
+
 	return files
 }
 
@@ -743,6 +756,13 @@ export function getAssetsForItem(parsedProject: ParsedProject, identifier: strin
 				path: textureFile
 			})
 		}
+	}
+
+	const attachable = parsedProject.rp_attachables[identifier]
+	if (attachable) {
+		files.push(
+			...getAssetsForClientEntity(parsedProject, attachable)
+		)
 	}
 
 	return files
