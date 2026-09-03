@@ -170,10 +170,16 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
             if (additionalFilesToInclude === undefined) {
                 return
             }
+
+            for (const file of additionalFilesToInclude) {
+                importer.importFile(file)
+            }
+
         }
     }
 
     await importer.applyFileChanges()
+    vscode.window.showInformationMessage(`Snippet "${metaFile.name}" imported.`)
 }
 
 async function getScriptFileImportOptions(

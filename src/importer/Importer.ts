@@ -948,6 +948,12 @@ export class Importer {
         }
     }
 
+    public async importFile(sourceFilePath: FilePathData) {
+        const destinationPath = this.getDestinationFilePath(sourceFilePath)
+
+        this.copyFileToProject(destinationPath, sourceFilePath.exactPath, sourceFilePath)
+    }
+
     private async copyFileToProject(destinationPath: FilePathData, sourcePath: string, sourceFilePath?: FilePathData) {
         const { resourcePackDir, behaviorPackDir } = this.destinationProjectContext
         if (existsSync(destinationPath.exactPath)) {
@@ -972,7 +978,7 @@ export class Importer {
         }
     }
 
-    public async applyFileChanges() {
+    public async applyFileChanges() { 
         for (const fileWrite of this.fileWriteQueue) {
             await fileWrite()
         }
