@@ -5,6 +5,8 @@ All notable changes to the extension will be documented in this file.
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 
 ## [Unreleased]
+- Added snippet import system
+- Added go-to button
 - Removed error message that appears when no config.json file is found - it instead puts a warning message in the lantern treeview.
 
 ## [0.5.0]

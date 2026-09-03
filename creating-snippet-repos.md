@@ -1,7 +1,6 @@
 # Creating snippet repositories
 The extension fetches snippet repositories using git. You can see an example of a snippet repository [here](https://github.com/Bedrock-OSS/bedrock-examples/).
 
-
 A repository should have the following struture:
 - resources
   - snippet_one

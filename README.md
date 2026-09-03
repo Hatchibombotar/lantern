@@ -17,14 +17,18 @@ In the below picture, it shows all files linked to the zombie in the vanilla pac
 
 ### Import from Snippet Repository
 Lantern has a smart import feature that allows you to import files from repositories.
-![alt text](./images/import-snippet.png)
-
-It renames imported files, their identifiers, and references to save you time.
-![alt text](./images/rename-symbols.png)
 
 To use this, click on the package icon in the lantern menu or run `Lantern: Open Snippet Repository UI` from the command pallete.
 
 ![alt text](./images/snippet_button.png)
+
+Below is an example of importing a slime block from the bedrock-oss examples repository:
+
+![alt text](./images/import-example.gif)
+
+It renames imported files, their identifiers, and references to save you time.
+
+![alt text](./images/rename-symbols.png)
 
 To begin with, you must add a source for your snippets. Press the plus button on the top of the UI that is now open.
 
