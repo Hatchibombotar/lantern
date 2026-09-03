@@ -10,7 +10,7 @@ import { getIdentifierSymbols, getSymbolsLinkedByIdentifier, Symbol, symbolsEqua
 import { showRenameSymbolsUI, showSelectFilesUI } from '../quickPickUtils';
 import { showRenameFilesUI } from '../quickPickUtils';
 import { renameSymbolFromIdentifier } from '../importer/renameSymbols';
-import { getDefinitionFileForSymbol } from '../domainViewer/createFolderStructure';
+import { getDefinitionFilesForSymbol } from '../domainViewer/createFolderStructure';
 import { AddonFileTypes, ProjectFile } from '../analysis/AddonFileTypes';
 import { renamePathFromIdentifier } from '../importer/renamePaths';
 import { filePathsEqual } from '../FilePathData';
@@ -80,7 +80,7 @@ export async function importSnippetUI(context: vscode.ExtensionContext, selected
                 )
                 allSymbols.push(symbol)
 
-                const files = getDefinitionFileForSymbol(sourceProject, symbol)
+                const files = getDefinitionFilesForSymbol(sourceProject, symbol)
                 for (const file of files) {
                     // We save texture files seperately using the TexturePath symbol
                     if (file.fileType === AddonFileTypes.rp_texture) {

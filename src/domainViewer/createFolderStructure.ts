@@ -498,7 +498,7 @@ export function getFilesForBlock(parsedProject: ParsedProject, identifier: strin
 	return files
 }
 
-export function getDefinitionFileForSymbol(parsedProject: ParsedProject, symbol: Symbol): ProjectFile[] {
+export function getDefinitionFilesForSymbol(parsedProject: ParsedProject, symbol: Symbol): ProjectFile[] {
 	const files: ProjectFile[] = []
 
 	switch (symbol.type) {

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import ExtensionRoot from '../ExtensionRoot';
 import { getIdentifierSymbols, getReferencedBlockSymbols, getReferencedEntitySymbols, getReferencedItemSymbols, Symbol, SymbolType, symbolTypeReadableName } from '../analysis/symbols';
+import { getDefinitionFilesForSymbol } from '../domainViewer/createFolderStructure';
 
 export function registerGoToCommand(context: vscode.ExtensionContext, extensionRoot: ExtensionRoot) {
     return vscode.commands.registerCommand("bedrockLantern.goToSymbol", async (element: vscode.TreeItem) => {
@@ -33,12 +34,22 @@ export function registerGoToCommand(context: vscode.ExtensionContext, extensionR
         const result = await vscode.window.showQuickPick(
             symbols.map((symbol) => ({
                 label: symbol.value,
-                detail: symbolTypeReadableName[symbol.type]
+                detail: symbolTypeReadableName[symbol.type],
+                symbol
             })),
             {
                 title: "Go To..."
             }
         )
 
+        if (result === undefined) return
+
+        const symbol = result.symbol
+        const files = getDefinitionFilesForSymbol(sourceProject, symbol)
+
+        const filePath = files[0].path.exactPath
+
+        const uri = vscode.Uri.file(filePath)
+        await vscode.window.showTextDocument(uri)
     })
 }

@@ -5,7 +5,7 @@ import { simpleGit, SimpleGitProgressEvent } from 'simple-git';
 import { createGlobalStorageDirectory } from '../utils';
 import { existsSync } from 'fs';
 import { AddonFileTypes } from '../analysis/AddonFileTypes';
-import { getDefinitionFileForSymbol, Node } from '../domainViewer/createFolderStructure';
+import { getDefinitionFilesForSymbol, Node } from '../domainViewer/createFolderStructure';
 import { ProjectFile } from '../analysis/AddonFileTypes';
 import { getSymbolsLinkedByIdentifier, Symbol, symbolsEqual, SymbolType, SymbolValue } from '../analysis/symbols';
 import { showRenameSymbolsUI } from '../quickPickUtils';
@@ -146,7 +146,7 @@ async function importEntityFromProject(projectParser: ProjectParser, folderPath?
     if (renamedSymbols === undefined) return
 
     // 4. Rename files
-    const files = getDefinitionFileForSymbol(sourceProject, identifier)
+    const files = getDefinitionFilesForSymbol(sourceProject, identifier)
     const initialRenamedFiles: [ProjectFile, string][] = []
 
     for (const file of files) {
