@@ -36,7 +36,7 @@ export class Importer {
 
         const projectContext = getProjectContext()
         if (!projectContext) {
-            throw Error("")
+            throw Error("No project context provided")
         }
 
         this.destinationProjectContext = projectContext
@@ -183,7 +183,7 @@ export class Importer {
                 console.error("File does not exist for symbol " + symbol.value)
                 continue
             }
-            const data = filesToImport.find(([x]) => filePathsEqual(file, x) ?? filePathsEqual(file.path, x))
+            const data = filesToImport.find(([x]) => filePathsEqual(file, x) || filePathsEqual(file.path, x))
 
             if (data) {
                 data[1].push(symbol)
@@ -212,12 +212,12 @@ export class Importer {
         const bp_entity = this.sourceProject.bp_entity[symbol.value]
         const file = (await fs.readFile(bp_entity.path.exactPath)).toString()
 
-        let errors: JSONC.ParseError[] = [];
+        // let errors: JSONC.ParseError[] = [];
         // const parsedFile = JSONC.parse(file, errors)
 
-        if (errors.length > 0) {
-            throw Error(errors.toString())
-        }
+        // if (errors.length > 0) {
+        //     throw Error(errors.toString())
+        // }
 
         let result = jsoncModifyandEditWithInitialisedParents(
             file,
@@ -415,12 +415,6 @@ export class Importer {
         if (this.sourceProject.rp_block_culling_rules[symbol.value] !== undefined) {
             const culling = this.sourceProject.rp_block_culling_rules[symbol.value]
             const file = (await fs.readFile(culling.exactPath)).toString()
-
-            let errors: JSONC.ParseError[] = [];
-
-            if (errors.length > 0) {
-                throw Error(errors.toString())
-            }
 
             let result = jsoncModifyandEditWithInitialisedParents(
                 file,
@@ -767,7 +761,7 @@ export class Importer {
                     value: blockData.textures
                 })
             } else if (blockData.textures) {
-                for (const [part, texture] of Object.keys(blockData.textures)) {
+                for (const [part, texture] of Object.entries(blockData.textures)) {
                     assert(typeof texture === "string")
                     blockData.textures[part] = this.getRenamedSymbolValue({
                         type: SymbolType.BlockTextureShortname,
@@ -782,7 +776,7 @@ export class Importer {
                     value: blockData.carried_textures
                 })
             } else if (blockData.carried_textures) {
-                for (const [part, texture] of Object.keys(blockData.carried_textures)) {
+                for (const [part, texture] of Object.entries(blockData.carried_textures)) {
                     assert(typeof texture === "string")
                     blockData.carried_textures[part] = this.getRenamedSymbolValue({
                         type: SymbolType.BlockTextureShortname,
